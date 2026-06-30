@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#facc15"/><stop offset="1" stop-color="#fb923c"/></linearGradient></defs>
+  <rect width="640" height="420" fill="url(#g)"/>
+  <rect x="220" y="72" width="200" height="276" rx="20" fill="#fff7ed"/>
+  <line x1="258" y1="136" x2="382" y2="136" stroke="#c2410c" stroke-width="10" stroke-linecap="round"/>
+  <line x1="258" y1="184" x2="382" y2="184" stroke="#c2410c" stroke-width="10" stroke-linecap="round"/>
+  <line x1="258" y1="232" x2="382" y2="232" stroke="#c2410c" stroke-width="10" stroke-linecap="round"/>
+  <text x="320" y="304" text-anchor="middle" font-size="32" font-family="Microsoft YaHei,Arial" fill="#c2410c" font-weight="900">笔记</text>
+</svg>

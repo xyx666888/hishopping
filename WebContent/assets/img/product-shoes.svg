@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#22c55e"/><stop offset="1" stop-color="#84cc16"/></linearGradient></defs>
+  <rect width="640" height="420" fill="url(#g)"/>
+  <path d="M172 254c58 8 112-20 154-70 12-14 34-10 42 6 20 42 58 62 110 72 34 6 44 48 14 66-54 32-250 28-330 10-42-10-34-90 10-84z" fill="#f8fafc"/>
+  <path d="M248 246c54 22 126 30 218 20" fill="none" stroke="#166534" stroke-width="16" stroke-linecap="round"/>
+  <text x="320" y="178" text-anchor="middle" font-size="34" font-family="Microsoft YaHei,Arial" fill="#fff" font-weight="900">运动鞋</text>
+</svg>

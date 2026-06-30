@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#0ea5e9"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+  <rect width="640" height="420" fill="url(#g)"/>
+  <circle cx="108" cy="330" r="140" fill="#fff" opacity=".16"/>
+  <path d="M232 152c0-38 31-69 69-69h38c38 0 69 31 69 69v116c0 38-31 69-69 69h-38c-38 0-69-31-69-69z" fill="#fff" opacity=".92"/>
+  <circle cx="291" cy="198" r="34" fill="#075985"/>
+  <circle cx="349" cy="198" r="34" fill="#075985"/>
+  <text x="320" y="286" text-anchor="middle" font-size="34" font-family="Microsoft YaHei,Arial" fill="#075985" font-weight="900">耳机</text>
+</svg>

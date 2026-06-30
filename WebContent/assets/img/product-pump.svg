@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#475569"/><stop offset="1" stop-color="#0f172a"/></linearGradient></defs>
+  <rect width="640" height="420" fill="url(#g)"/>
+  <rect x="232" y="96" width="176" height="214" rx="38" fill="#e2e8f0"/>
+  <rect x="262" y="126" width="116" height="62" rx="18" fill="#0f172a"/>
+  <circle cx="320" cy="244" r="40" fill="#f97316"/>
+  <path d="M408 164c70 10 80 82 34 118" fill="none" stroke="#e2e8f0" stroke-width="20" stroke-linecap="round"/>
+  <text x="320" y="166" text-anchor="middle" font-size="26" font-family="Microsoft YaHei,Arial" fill="#fff" font-weight="900">胎压</text>
+</svg>

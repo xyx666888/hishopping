@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420">
+  <defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#334155"/><stop offset="1" stop-color="#64748b"/></linearGradient></defs>
+  <rect width="640" height="420" fill="url(#g)"/>
+  <rect x="246" y="72" width="148" height="170" rx="36" fill="#e2e8f0"/>
+  <rect x="226" y="222" width="188" height="54" rx="26" fill="#f8fafc"/>
+  <line x1="320" y1="276" x2="320" y2="338" stroke="#0f172a" stroke-width="18" stroke-linecap="round"/>
+  <line x1="252" y1="350" x2="388" y2="350" stroke="#0f172a" stroke-width="18" stroke-linecap="round"/>
+  <text x="320" y="168" text-anchor="middle" font-size="34" font-family="Microsoft YaHei,Arial" fill="#0f172a" font-weight="900">座椅</text>
+</svg>
