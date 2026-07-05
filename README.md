@@ -1,2 +1,2 @@
 # hishopping
-My first time to use GitHub.This project is made by codex and chatgpt.
+My first time to use GitHub to release a vibe coding project.
