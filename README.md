@@ -96,6 +96,16 @@ WebContent/WEB-INF/web.xml   Web 应用配置
 
 ---
 
+## 🖼 素材说明
+
+本项目中使用的部分图片、图标等素材来源于网络，仅用于学习交流和课程实践。
+
+如有侵权，请联系删除。
+
+联系方式：3840632919@qq.com
+
+---
+
 感谢你看到这里！🌱
 
 ---
@@ -198,6 +208,16 @@ WebContent/WEB-INF/web.xml   Web application configuration
 3. Run `WebContent/sql/hishopping.sql` to initialize the database.
 4. Update the database connection configuration according to your local environment.
 5. Start Tomcat and open the project homepage.
+
+---
+
+## 🖼 Asset Notice
+
+Some images, icons, and other assets used in this project are sourced from the Internet and are used only for learning, communication, and course practice.
+
+If there is any infringement, please contact me for removal.
+
+Contact: 3840632919@qq.com
 
 ---
 
