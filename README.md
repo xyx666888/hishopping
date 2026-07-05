@@ -1,7 +1,7 @@
 # 🛒 HiShopping 嗨购商城
 
 > 🎓 一个由在校学生完成的 Java Web 电商实践项目  
-> 💡 My first vibe coding project on GitHub, and also a group practice assignment.
+> 💡 我的第一个在 GitHub上的 vibe coding 项目，同时也是一次小组实践作业。
 
 ![Java](https://img.shields.io/badge/Java-8%2B-orange?style=flat-square)
 ![Servlet](https://img.shields.io/badge/Servlet-JSP-blue?style=flat-square)
@@ -93,18 +93,6 @@ WebContent/WEB-INF/web.xml   Web 应用配置
 3. 执行 `WebContent/sql/hishopping.sql` 初始化数据库。
 4. 根据本地数据库环境修改数据库连接配置。
 5. 启动 Tomcat，访问项目首页。
-
----
-
-## 📄 License
-
-本项目采用 **MIT License** 开源协议。
-
-你可以自由地学习、使用、修改和分发本项目代码，但需要保留原作者的版权声明和许可声明。
-
-本项目主要用于学习交流和课程实践，不提供任何形式的担保，也不保证代码适用于生产环境。
-
-如需将本项目用于商业用途、二次发布或课程提交以外的场景，请自行确认相关责任与合规要求。
 
 ---
 
@@ -210,18 +198,6 @@ WebContent/WEB-INF/web.xml   Web application configuration
 3. Run `WebContent/sql/hishopping.sql` to initialize the database.
 4. Update the database connection configuration according to your local environment.
 5. Start Tomcat and open the project homepage.
-
----
-
-## 📄 License
-
-This project is released under the **MIT License**.
-
-You are free to learn from, use, modify, and distribute the code, as long as the original copyright notice and license notice are retained.
-
-This project is mainly intended for learning, communication, and course practice. It is provided without any warranty and is not guaranteed to be suitable for production use.
-
-If you plan to use this project for commercial purposes, redistribution, or scenarios beyond coursework and learning, please make sure to review the related responsibilities and compliance requirements by yourself.
 
 ---
 
