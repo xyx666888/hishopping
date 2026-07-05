@@ -111,7 +111,7 @@ WebContent/WEB-INF/web.xml   Web 应用配置
 ---
 
 <details>
-<summary>English version ▶</summary>
+<summary>English version</summary>
 
 # 🛒 HiShopping
 
