@@ -8,7 +8,7 @@
 ![Database](https://img.shields.io/badge/Database-SQL%20Server-green?style=flat-square)
 ![Tomcat](https://img.shields.io/badge/Server-Tomcat-yellow?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Learning%20Project-brightgreen?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)](LICENSE)
 
 ---
 
@@ -123,7 +123,7 @@ WebContent/WEB-INF/web.xml   Web 应用配置
 ![Database](https://img.shields.io/badge/Database-SQL%20Server-green?style=flat-square)
 ![Tomcat](https://img.shields.io/badge/Server-Tomcat-yellow?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Learning%20Project-brightgreen?style=flat-square)
-![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)
+[![License](https://img.shields.io/badge/License-MIT-lightgrey?style=flat-square)](LICENSE)
 
 ---
 
