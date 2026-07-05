@@ -372,6 +372,29 @@ button {
 	font-size: 16px;
 }
 
+.field textarea {
+	width: 100%;
+	min-height: 112px;
+	padding: 14px 16px;
+	border: 1px solid var(--slate-200);
+	border-radius: 18px;
+	outline: none;
+	background: #f8fafc;
+	color: var(--slate-800);
+	font: inherit;
+	font-size: 16px;
+	font-weight: 800;
+	line-height: 1.55;
+	resize: vertical;
+	box-sizing: border-box;
+}
+
+.field textarea:focus {
+	border-color: #a78bfa;
+	background: #fff;
+	box-shadow: 0 0 0 4px rgba(124, 58, 237, .1);
+}
+
 .target-group-select {
 	position: relative;
 	width: 100%;
@@ -1959,6 +1982,14 @@ button {
 	gap: 18px;
 }
 
+.settings-page > .section-head {
+	padding-right: 16px;
+}
+
+.settings-page > .section-head .ghost-btn {
+	flex: 0 0 auto;
+}
+
 .favorite-list {
 	display: grid;
 	gap: 16px;
@@ -2292,7 +2323,7 @@ button {
 
 .chat-window {
 	display: grid;
-	grid-template-rows: auto minmax(360px, 1fr) auto auto;
+	grid-template-rows: auto minmax(0, 1fr) auto;
 	min-width: 0;
 	min-height: 0;
 	background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(248,250,252,.92));
@@ -2576,6 +2607,7 @@ button {
 .chat-input {
 	display: grid;
 	gap: 8px;
+	min-height: 0;
 	padding: 12px 20px 16px;
 	border-top: 1px solid var(--border);
 	background: rgba(255, 255, 255, .94);
@@ -2633,7 +2665,7 @@ button {
 	resize: none;
 	color: var(--slate-900);
 	background: #fff;
-	min-height: 64px;
+	min-height: 56px;
 }
 
 .chat-tools {
@@ -2706,8 +2738,8 @@ button {
 .emoji-panel {
 	display: none;
 	gap: 8px;
-	padding: 10px 20px 0;
-	background: rgba(255,255,255,.94);
+	padding: 0 2px 2px;
+	background: transparent;
 }
 
 .emoji-panel.show {
@@ -3647,6 +3679,44 @@ button {
 	grid-column: span 2;
 }
 
+.account-request-form {
+	grid-template-columns: minmax(0, 760px);
+	grid-template-areas:
+		"type"
+		"avatar"
+		"note"
+		"action";
+	align-items: start;
+	justify-content: start;
+	gap: 16px;
+	width: 100%;
+	max-width: 820px;
+	margin: 18px 0 26px;
+	padding: 20px;
+	border: 1px solid rgba(226, 232, 240, .92);
+	border-radius: 24px;
+	background: linear-gradient(135deg, rgba(248,250,252,.94), rgba(255,255,255,.96));
+	box-sizing: border-box;
+	box-shadow: inset 0 1px 0 rgba(255,255,255,.85);
+}
+
+.account-request-form > .field:not(.wide):not(.account-avatar-field) {
+	grid-area: type;
+}
+
+.account-request-form .account-avatar-field {
+	grid-area: avatar;
+}
+
+.account-request-form .field.wide {
+	grid-area: note;
+	min-width: 0;
+}
+
+.account-request-form .field textarea {
+	min-height: 128px;
+}
+
 #couponTemplateForm .primary-btn {
 	grid-row: 3;
 	grid-column: 2;
@@ -3685,15 +3755,70 @@ button {
 }
 
 .account-request-form .account-request-submit {
-	grid-column: 3;
+	grid-area: action;
 	align-self: end;
-	justify-self: start;
-	width: auto;
-	min-width: 132px;
-	min-height: 46px;
-	height: 46px;
-	padding: 0 26px;
-	border-radius: 16px;
+	justify-self: end;
+	width: 180px;
+	max-width: 100%;
+	min-height: 58px;
+	padding: 14px 24px;
+	border-radius: 18px;
+}
+
+.account-request-history {
+	max-width: 1120px;
+	margin-top: 8px;
+	border: 1px solid rgba(226, 232, 240, .92);
+	border-radius: 24px;
+	background: rgba(255, 255, 255, .82);
+	overflow: hidden;
+	box-shadow: 0 16px 36px rgba(109, 40, 217, .06);
+}
+
+.account-request-history .section-head {
+	padding: 18px 20px 12px;
+	border-bottom: 1px solid rgba(226, 232, 240, .8);
+}
+
+.account-request-history .admin-table {
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+}
+
+.account-request-history table {
+	min-width: 760px;
+}
+
+.account-request-history th {
+	background: #f8fafc;
+	color: var(--slate-600);
+}
+
+.account-request-history td {
+	background: #fff;
+}
+
+.account-request-empty td {
+	padding: 28px 20px;
+	text-align: center;
+}
+
+.account-request-empty b,
+.account-request-empty span {
+	display: block;
+}
+
+.account-request-empty b {
+	margin-bottom: 6px;
+	color: var(--slate-800);
+	font-size: 18px;
+}
+
+.account-request-empty span {
+	color: var(--slate-500);
+	font-weight: 800;
 }
 
 .detail-option:disabled,
@@ -5038,6 +5163,39 @@ img.product-media-main {
 	font-weight: 800;
 }
 
+.media-fallback {
+	display: grid;
+	place-items: center;
+	width: 100%;
+	height: 100%;
+	min-height: 64px;
+	padding: 10px;
+	border: 1px dashed var(--slate-300);
+	border-radius: inherit;
+	color: var(--slate-500);
+	background: #f8fafc;
+	font-size: 13px;
+	font-weight: 900;
+	line-height: 1.35;
+	text-align: center;
+}
+
+.product-media-main.media-fallback {
+	min-height: 260px;
+	background: linear-gradient(135deg, #f8fafc, #eef2ff);
+}
+
+.product-media-thumb-img.media-fallback,
+.admin-product-media-img.media-fallback {
+	min-height: 100%;
+	padding: 4px;
+	font-size: 10px;
+}
+
+.merchant-media-preview.media-fallback {
+	min-height: 100%;
+}
+
 .merchant-media-manager {
 	display: grid;
 	gap: 12px;
@@ -5060,6 +5218,11 @@ img.product-media-main {
 	width: 1px;
 	height: 1px;
 	opacity: 0;
+	pointer-events: none;
+}
+
+.merchant-media-upload input[type="file"]:disabled + .upload-file-btn {
+	opacity: .68;
 	pointer-events: none;
 }
 
@@ -5185,6 +5348,67 @@ img.product-media-main {
 	object-fit: cover;
 }
 
+.product-title h4,
+.cart-item-info h3 {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	word-break: break-word;
+}
+
+.product-card p,
+.cart-item-info p {
+	display: -webkit-box;
+	overflow: hidden;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+	word-break: break-word;
+}
+
+.product-card .product-stat-line {
+	display: block;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.card-actions .primary-btn,
+.card-actions .ghost-btn,
+.dual-actions .primary-btn,
+.dual-actions .ghost-btn {
+	min-height: 42px;
+}
+
+.detail-info .muted,
+.detail-purchase .muted,
+.checkout-address small {
+	overflow-wrap: anywhere;
+}
+
+.detail-purchase .muted {
+	flex: 1 1 220px;
+	min-width: 0;
+}
+
+.cart-item-actions {
+	min-width: 138px;
+}
+
+.admin-table th,
+.admin-table td {
+	overflow-wrap: anywhere;
+}
+
+.merchant-product-actions .primary-btn,
+.merchant-product-actions .ghost-btn {
+	min-width: 0;
+	min-height: 36px;
+	padding: 8px 9px;
+	line-height: 1.2;
+	white-space: normal;
+}
+
 @media (max-width: 720px) {
 	.product-media-stage {
 		aspect-ratio: 1 / 1;
@@ -5202,5 +5426,17 @@ img.product-media-main {
 	.merchant-media-upload,
 	.merchant-media-actions {
 		grid-template-columns: 1fr;
+	}
+
+	.merchant-media-actions {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.product-media-main.media-fallback {
+		min-height: 180px;
+	}
+
+	.cart-item-actions {
+		min-width: 0;
 	}
 }

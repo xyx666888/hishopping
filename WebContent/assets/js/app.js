@@ -47,6 +47,7 @@ var state = {
 	chatQuoteMessage: null,
 	chatContextMenu: null,
 	chatScrollToBottom: false,
+	emojiPanelOpen: false,
 	unreadMessages: 0,
 	messageContacts: [],
 	accountRequests: [],
@@ -88,6 +89,14 @@ var state = {
 	selectedMerchantCouponId: null,
 	couponCenterCollapsed: false
 };
+
+var apiBasePath = String(window.HISHOPPING_CONTEXT_PATH || "").replace(/\/$/, "");
+
+function apiUrl(url) {
+	url = String(url || "");
+	if (!url || /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(url) || url.charAt(0) === "/") return url;
+	return apiBasePath + "/" + url.replace(/^\/+/, "");
+}
 
 try {
 	state.couponCenterCollapsed = localStorage.getItem("hishoppingCouponCenterCollapsed") === "1";
@@ -223,7 +232,7 @@ function optionHtml(items, selectedName) {
 }
 
 function post(url, data) {
-	return fetch(url, {
+	return fetch(apiUrl(url), {
 		method: "POST",
 		headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
 		body: new URLSearchParams(data || {})
@@ -231,13 +240,13 @@ function post(url, data) {
 }
 
 function get(url) {
-	return fetch(url).then(parseJsonResponse);
+	return fetch(apiUrl(url)).then(parseJsonResponse);
 }
 
 function uploadFormData(url, formData, onProgress) {
 	return new Promise(function(resolve, reject) {
 		var xhr = new XMLHttpRequest();
-		xhr.open("POST", url, true);
+		xhr.open("POST", apiUrl(url), true);
 		xhr.upload.onprogress = function(e) {
 			if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded * 100 / e.total));
 		};
@@ -302,11 +311,20 @@ function productMediaList(product) {
     return list;
 }
 
+function mediaFallbackHtml(className, text) {
+    return '<span class="media-fallback ' + escapeHtml(className || "") + '">' + escapeHtml(text || "媒体加载失败") + '</span>';
+}
+
+function mediaErrorAttr(className, text) {
+    var html = JSON.stringify(mediaFallbackHtml(className, text)).replace(/"/g, "&quot;");
+    return ' onerror="this.outerHTML=' + html + '"';
+}
+
 function productMediaHtml(media, className) {
-    if (!media || !media.mediaUrl) return "";
+    if (!media || !media.mediaUrl) return mediaFallbackHtml(className, "暂无媒体");
     var type = String(media.mediaType || "IMAGE").toUpperCase();
-    if (type === "VIDEO") return '<video class="' + className + '" src="' + escapeHtml(media.mediaUrl) + '" controls playsinline preload="metadata"></video>';
-    return '<img class="' + className + '" src="' + escapeHtml(media.mediaUrl) + '" alt="">';
+    if (type === "VIDEO") return '<video class="' + className + '" src="' + escapeHtml(media.mediaUrl) + '" controls playsinline preload="metadata"' + mediaErrorAttr(className, "视频加载失败") + '></video>';
+    return '<img class="' + className + '" src="' + escapeHtml(media.mediaUrl) + '" alt="商品媒体" loading="lazy"' + mediaErrorAttr(className, "图片加载失败") + '>';
 }
 
 function productMediaCarousel(product) {
@@ -812,7 +830,7 @@ function showToast(text) {
 function renderNav() {
 	var html = activeNavItems().map(function(item) {
 		var navCount = navBadgeCount(item.key);
-		var suffix = navCount ? '<span>' + navCount + '</span>' : '<span>?</span>';
+		var suffix = navCount ? '<span>' + navCount + '</span>' : "";
 		var iconClass = item.key.indexOf("Messages") >= 0 || item.key === "messages" ? " nav-icon-message" : "";
 		return '<button type="button" class="' + (state.page === item.key ? "active" : "") + '" data-page="' + item.key + '">' +
 			'<span class="nav-label"><img class="nav-icon' + iconClass + '" src="' + item.icon + '" alt="">' + item.label + '</span>' + suffix + '</button>';
@@ -855,7 +873,11 @@ function setPage(page) {
 	document.getElementById("pageTitle").textContent = item ? item.label : (pageTitles[page] || "购物平台");
 	updateShellForRole();
 	renderNav();
-	loadPageData(page).then(renderPage);
+	renderPage();
+	loadPageData(page).then(renderPage).catch(function(err) {
+		renderPage();
+		showToast(err.message || "数据加载失败，请稍后重试。");
+	});
 	updateOrderRefresh();
 }
 
@@ -1227,6 +1249,7 @@ function openDetail(productId, sourcePage) {
 			state.detailMediaIndex = 0;
 			syncDetailOptions();
 			setPage("detail");
+			renderPage();
 		}
 	});
 }
@@ -1321,7 +1344,7 @@ function renderHallHero(previewOnly) {
 	var media = String(banner.mediaType || "IMAGE").toUpperCase() === "VIDEO"
 		? '<video class="hall-media" src="' + escapeHtml(banner.mediaUrl) + '" ' + (banner.videoMutedDefault ? "muted " : "") + 'autoplay loop playsinline ' + (banner.videoDisablePause ? 'data-lock-pause="1" ' : '') + (banner.videoDisableSeek ? 'data-lock-seek="1" ' : '') + '></video>'
 		: '<img class="hall-media" src="' + escapeHtml(banner.mediaUrl) + '" alt="">';
-	var controls = banners.length > 1 ? '<button class="hall-arrow hall-prev" type="button">?</button><button class="hall-arrow hall-next" type="button">?</button><div class="hall-dots">' + banners.map(function(_, i) { return '<button class="' + (i === index ? "active" : "") + '" data-index="' + i + '" type="button"></button>'; }).join("") + '</div>' : "";
+	var controls = banners.length > 1 ? '<button class="hall-arrow hall-prev" type="button">&lsaquo;</button><button class="hall-arrow hall-next" type="button">&rsaquo;</button><div class="hall-dots">' + banners.map(function(_, i) { return '<button class="' + (i === index ? "active" : "") + '" data-index="' + i + '" type="button"></button>'; }).join("") + '</div>' : "";
 	var linkClass = banner.linkEnabled && !previewOnly ? " hall-clickable" : "";
 	var titleStyle = ' style="color:' + escapeHtml(banner.titleColor || "#ffffff") + '"';
 	var subtitleStyle = ' style="color:' + escapeHtml(banner.subtitleColor || "#e2e8f0") + '"';
@@ -1506,7 +1529,7 @@ function renderProfile() {
 		["地址管理", "维护收货地址与默认地址", "address"],
 		["我的设置", "维护头像、资料、账号申请", "settings"]
 	].map(function(item) {
-		var icon = item[2] === "vip" ? "VIP" : (item[2] === "coupons" ? "券" : (item[2] === "favorites" ? "?" : "设"));
+		var icon = item[2] === "vip" ? "VIP" : (item[2] === "coupons" ? "券" : (item[2] === "favorites" ? "藏" : "设"));
 		return '<button class="simple-card profile-link" data-page="' + item[2] + '" type="button"><div class="icon-tile">' + icon + '</div><strong>' + item[0] + '</strong><span>' + item[1] + '</span></button>';
 	}).join("");
 	return '<div class="profile-grid vip-profile-grid"><div class="profile-card vip-profile-card"><div class="vip-card-top">' + avatarMarkup(user.avatarUrl, "人", "profile-avatar") + '<div><span class="vip-level-pill">VIP' + vip.level + '</span><h2>' + escapeHtml(user.username) + '</h2><p>当前等级：' + vipLevelLabel(vip) + '</p></div></div><div class="vip-progress-head"><strong>' + progress.nextText + '</strong><span>' + progress.progressText + '</span></div><div class="vip-progress"><i style="width:' + progress.progressPct.toFixed(1) + '%"></i></div><div class="profile-metrics compact vip-metrics"><div><b>' + escapeHtml(user.accountId || user.id) + '</b><span>登录ID</span></div><div><b>' + progress.growthText + '</b><span>成长值</span></div><div><b>' + compactNumber(user.points || 0) + '</b><span>积分</span></div><div><b>' + vip.coupons + '</b><span>每月券数</span></div><div><b>' + Number(state.reviewStats.reviewCount || 0) + '</b><span>我的评价</span></div><div><b>' + Number(state.reviewStats.likedCount || 0) + '</b><span>评价获赞</span></div></div></div><div class="profile-actions compact"><article class="simple-card vip-benefit-card"><div class="icon-tile"><img src="' + vipBadgeSrc(vip.level) + '" alt="VIP' + vip.level + '"></div><strong>我的会员权益</strong><span>' + vipDiscountText(vip) + ' · 积分 ' + vip.pointRate + ' 倍 · ' + escapeHtml(vip.serviceLevel) + '</span><div class="vip-benefit-list">' + benefitList + '</div></article>' + actions + '</div></div>';
@@ -1678,9 +1701,10 @@ function renderMessages() {
 	var header = current ? avatarHtml(current.peerAvatar, current.peerName) + '<div><h3>' + escapeHtml(current.peerName) + '</h3><p>' + roleName(current.peerRole) + ' #' + escapeHtml(current.peerId) + '</p></div>' : '<span class="chat-avatar text-avatar">聊</span><div><h3>我的消息</h3><p>真实会话、附件和未读提醒已接入数据库</p></div>';
 	var modal = renderChatModal();
 	var friendEntry = state.user ? '<button class="primary-btn chat-modal-open" data-modal="friend" type="button">添加好友</button>' : '';
+	var emojiPanelClass = state.emojiPanelOpen ? " show" : "";
 	return '<section class="message-page chat-page"><div class="message-hero chat-hero"><img src="assets/img/nav-message.png" alt=""><div><span class="badge">业务沟通中心</span><h2>我的消息</h2><p>' + role + '端消息支持好友、订单咨询、商品卡片、退款售后和附件消息。</p></div>' + friendEntry + '</div>' +
 		'<div class="chat-shell"><aside class="chat-sidebar"><div class="chat-search"><select id="chatTargetRole">' + targetRoleOptions + '</select><input id="chatTargetKeyword" value="' + escapeHtml(state.messageSearchKeyword || "") + '" placeholder="搜索联系人"><button class="ghost-btn" id="chatTargetSearch" type="button">搜索</button></div><div class="chat-targets">' + targetRows + '</div><div class="conversation-list">' + convRows + '</div></aside>' +
-		'<section class="chat-window"><header class="chat-window-head">' + header + '</header><main class="chat-messages" id="chatMessages">' + messages + '</main><div class="emoji-panel" id="emojiPanel"><button type="button">??</button><button type="button">??</button><button type="button">??</button><button type="button">??</button><button type="button">??</button><button type="button">??</button></div><form class="chat-input" id="chatInputForm">' + renderChatQuotePreview(disabled) + '<textarea id="chatInputText" ' + disabled + ' rows="2" placeholder="' + (disabled ? "系统通知不可回复，请选择聊天会话" : "输入消息，Enter 发送，Shift+Enter 换行") + '"></textarea><div class="chat-tools"><button class="ghost-btn" id="emojiToggle" type="button" ' + disabled + '>Emoji</button><button class="ghost-btn chat-modal-open" data-modal="order" type="button" ' + disabled + '>发送订单</button><button class="ghost-btn chat-send-product" type="button" ' + disabled + '>发送商品</button><button class="ghost-btn chat-modal-open" data-modal="refund" type="button" ' + disabled + '>申请退款</button><label class="ghost-btn ' + disabled + '">图片<input id="chatImageFile" type="file" accept="image/*" ' + disabled + '></label><label class="ghost-btn ' + disabled + '">文件<input id="chatDocFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar,.ppt,.pptx,.csv" ' + disabled + '></label><label class="ghost-btn ' + disabled + '">视频<input id="chatVideoFile" type="file" accept="video/mp4,video/webm" ' + disabled + '></label><span class="chat-upload-progress" id="chatUploadProgress"><i></i></span><button class="primary-btn chat-send-btn" type="submit" ' + sendDisabled + '>' + sendText + '</button></div></form></section></div>' + modal + renderChatContextMenu() + '</section>';
+		'<section class="chat-window"><header class="chat-window-head">' + header + '</header><main class="chat-messages" id="chatMessages">' + messages + '</main><form class="chat-input" id="chatInputForm"><div class="emoji-panel' + emojiPanelClass + '" id="emojiPanel"><button type="button">&#128512;</button><button type="button">&#128077;</button><button type="button">&#10084;&#65039;</button><button type="button">&#128514;</button><button type="button">&#128546;</button><button type="button">&#128558;</button></div>' + renderChatQuotePreview(disabled) + '<textarea id="chatInputText" ' + disabled + ' rows="2" placeholder="' + (disabled ? "系统通知不可回复，请选择聊天会话" : "输入消息，Enter 发送，Shift+Enter 换行") + '"></textarea><div class="chat-tools"><button class="ghost-btn" id="emojiToggle" type="button" ' + disabled + '>表情</button><button class="ghost-btn chat-modal-open" data-modal="order" type="button" ' + disabled + '>发送订单</button><button class="ghost-btn chat-send-product" type="button" ' + disabled + '>发送商品</button><button class="ghost-btn chat-modal-open" data-modal="refund" type="button" ' + disabled + '>申请退款</button><label class="ghost-btn ' + disabled + '">图片<input id="chatImageFile" type="file" accept="image/*" ' + disabled + '></label><label class="ghost-btn ' + disabled + '">文件<input id="chatDocFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar,.ppt,.pptx,.csv" ' + disabled + '></label><label class="ghost-btn ' + disabled + '">视频<input id="chatVideoFile" type="file" accept="video/mp4,video/webm" ' + disabled + '></label><span class="chat-upload-progress" id="chatUploadProgress"><i></i></span><button class="primary-btn chat-send-btn" type="submit" ' + sendDisabled + '>' + sendText + '</button></div></form></section></div>' + modal + renderChatContextMenu() + '</section>';
 }
 
 function renderChatModal() {
@@ -1748,8 +1772,8 @@ function renderAccountRequestPanel(roleName) {
 	var rows = (state.accountRequests || []).map(function(item) {
 		var attach = item.attachmentUrl ? '<div class="request-avatar-preview"><img src="' + escapeHtml(item.attachmentUrl) + '" alt=""></div>' : '';
 		return '<tr><td>' + item.requestId + '</td><td>' + requestTypeText(item.requestType) + attach + '</td><td>' + escapeHtml(item.content || "") + '</td><td>' + requestStatusBadge(item.status) + '<p class="muted">' + escapeHtml(item.opinion || "") + '</p></td><td>' + escapeHtml(item.createTime || "") + '</td></tr>';
-	}).join("") || '<tr><td colspan="5">暂无申请记录。</td></tr>';
-	return '<section class="panel-card admin-section account-request-user-panel"><div class="section-head"><div><h2>我的设置</h2><p>' + roleName + '可在这里提交头像、资料、注销或恢复申请，管理员审核后通过消息中心反馈。</p></div></div><form class="address-form account-request-form" id="accountRequestForm"><input type="hidden" id="accountRequestAttachment"><label class="field"><span>设置内容</span><select id="accountRequestType"><option value="PROFILE">资料修改</option><option value="AVATAR">头像审核</option><option value="CANCEL">注销账号</option><option value="RESTORE">恢复账号</option></select></label><div class="field wide account-avatar-field"><span>头像图片</span><div class="avatar-upload-row"><div class="request-avatar-preview" id="accountAvatarPreview"></div><div><input id="accountAvatarFile" type="file" accept="image/*"><p class="muted" id="accountAvatarHint">上传后提交审核，通过后替换当前头像。</p><div class="upload-progress" id="avatarUploadProgress"><i></i></div></div></div></div><label class="field wide"><span>申请说明</span><textarea id="accountRequestContent" rows="4" placeholder="请写清楚要修改的资料、头像说明，或注销/恢复原因。"></textarea></label><button class="primary-btn account-request-submit" type="submit">提交审核</button></form><div class="admin-table"><table><thead><tr><th>ID</th><th>类型</th><th>说明</th><th>状态</th><th>提交时间</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+	}).join("") || '<tr class="account-request-empty"><td colspan="5"><b>暂无申请记录</b><span>提交头像、资料、注销或恢复申请后会显示在这里。</span></td></tr>';
+	return '<section class="panel-card admin-section account-request-user-panel"><div class="section-head"><div><h2>我的设置</h2><p>' + roleName + '可在这里提交头像、资料、注销或恢复申请，管理员审核后通过消息中心反馈。</p></div></div><form class="address-form account-request-form" id="accountRequestForm"><input type="hidden" id="accountRequestAttachment"><label class="field"><span>设置内容</span><select id="accountRequestType"><option value="PROFILE">资料修改</option><option value="AVATAR">头像审核</option><option value="CANCEL">注销账号</option><option value="RESTORE">恢复账号</option></select></label><div class="field wide account-avatar-field"><span>头像图片</span><div class="avatar-upload-row"><div class="request-avatar-preview" id="accountAvatarPreview"></div><div><input id="accountAvatarFile" type="file" accept="image/*"><p class="muted" id="accountAvatarHint">上传后提交审核，通过后替换当前头像。</p><div class="upload-progress" id="avatarUploadProgress"><i></i></div></div></div></div><label class="field wide"><span>申请说明</span><textarea id="accountRequestContent" rows="4" placeholder="请写清楚要修改的资料、头像说明，或注销/恢复原因。"></textarea></label><button class="primary-btn account-request-submit" type="submit">提交审核</button></form><section class="account-request-history"><div class="section-head compact-head"><div><h3>申请记录</h3><p>查看每次申请的处理状态和管理员反馈。</p></div></div><div class="admin-table"><table><thead><tr><th>ID</th><th>类型</th><th>说明</th><th>状态</th><th>提交时间</th></tr></thead><tbody>' + rows + '</tbody></table></div></section></section>';
 }
 
 function renderAdminAccountRequests() {
@@ -2833,9 +2857,14 @@ function bindChatEvents() {
 	var emojiToggle = document.getElementById("emojiToggle");
 	var emojiPanel = document.getElementById("emojiPanel");
 	if (emojiToggle && emojiPanel) {
-		emojiToggle.onclick = function() { emojiPanel.classList.toggle("show"); };
+		emojiToggle.onclick = function(e) {
+			e.preventDefault();
+			state.emojiPanelOpen = !state.emojiPanelOpen;
+			emojiPanel.classList.toggle("show", state.emojiPanelOpen);
+		};
 		Array.prototype.forEach.call(emojiPanel.querySelectorAll("button"), function(btn) {
-			btn.onclick = function() {
+			btn.onclick = function(e) {
+				e.preventDefault();
 				if (!input) return;
 				input.value += btn.textContent;
 				input.focus();
@@ -3974,14 +4003,26 @@ function bindPageActions() {
 				var mediaList = readMerchantMedia();
 				if (mediaList.length >= 6) { alert("商品媒体最多支持 6 个。"); mpMediaFile.value = ""; return; }
 				var fileName = document.getElementById("mpMediaFileName");
-				if (fileName) fileName.textContent = mpMediaFile.files[0].name;
+				var originalHint = fileName ? fileName.textContent : "";
+				if (fileName) fileName.textContent = mpMediaFile.files[0].name + " 上传中...";
+				mpMediaFile.disabled = true;
 				var fd = new FormData();
 				fd.append("media", mpMediaFile.files[0]);
-				fetch("merchant/productImage", { method: "POST", body: fd }).then(parseJsonResponse).then(function(data) {
-					if (!data.success) { alert(data.message || "上传失败"); return; }
+				fetch(apiUrl("merchant/productImage"), { method: "POST", body: fd }).then(parseJsonResponse).then(function(data) {
+					if (!data.success) {
+						alert(data.message || "上传失败");
+						if (fileName) fileName.textContent = originalHint || "最多 6 个图片或视频，第一项为主图";
+						return;
+					}
 					mediaList.push({ mediaType: data.mediaType || "IMAGE", mediaUrl: data.mediaUrl || data.imageUrl, sortNo: mediaList.length + 1 });
 					updateMerchantMedia(mediaList);
 					if (fileName) fileName.textContent = "已上传 " + mediaList.length + " 个媒体";
+					mpMediaFile.value = "";
+				}).catch(function(err) {
+					alert(err && err.message ? err.message : "上传接口未响应，请稍后重试。");
+					if (fileName) fileName.textContent = originalHint || "最多 6 个图片或视频，第一项为主图";
+				}).finally(function() {
+					mpMediaFile.disabled = false;
 					mpMediaFile.value = "";
 				});
 			};
@@ -4409,6 +4450,51 @@ function bindPageActions() {
 	}
 }
 
+function bindDelegatedPageActions() {
+	if (document.body.getAttribute("data-page-delegate-bound") === "true") return;
+	document.body.setAttribute("data-page-delegate-bound", "true");
+	document.addEventListener("click", function(e) {
+		var target = e.target;
+		if (!target || !target.closest) return;
+		var action = target.closest(".view-detail,.visual-open,.add-cart,.buy-now,.detail-add-cart,.detail-buy-now,.product-media-thumb,.product-media-prev,.product-media-next");
+		if (!action || action.onclick) return;
+		var appPage = document.getElementById("appPage");
+		if (appPage && !appPage.contains(action)) return;
+		if (action.classList.contains("view-detail") || action.classList.contains("visual-open")) {
+			e.preventDefault();
+			openDetail(Number(action.getAttribute("data-id")), state.page || "home");
+			return;
+		}
+		if (action.classList.contains("add-cart") || action.classList.contains("buy-now")) {
+			e.preventDefault();
+			addToCart(Number(action.getAttribute("data-id")), action.classList.contains("buy-now"));
+			return;
+		}
+		if (action.classList.contains("detail-add-cart") || action.classList.contains("detail-buy-now")) {
+			e.preventDefault();
+			var productId = Number(action.getAttribute("data-id"));
+			var goCart = action.classList.contains("detail-buy-now");
+			var chain = addToCart(productId, false, state.detailQuantity);
+			if (goCart) chain.then(function() { setPage("cart"); });
+			return;
+		}
+		if (action.classList.contains("product-media-thumb")) {
+			e.preventDefault();
+			state.detailMediaIndex = Number(action.getAttribute("data-index") || 0);
+			renderPage();
+			return;
+		}
+		if (action.classList.contains("product-media-prev") || action.classList.contains("product-media-next")) {
+			e.preventDefault();
+			var mediaList = productMediaList(state.selectedProduct || {});
+			if (!mediaList.length) return;
+			var delta = action.classList.contains("product-media-prev") ? -1 : 1;
+			state.detailMediaIndex = (Number(state.detailMediaIndex || 0) + delta + mediaList.length) % mediaList.length;
+			renderPage();
+		}
+	});
+}
+
 function renderPage() {
 	var root = document.getElementById("pageRoot");
 	var html = "";
@@ -4440,6 +4526,7 @@ function renderPage() {
 	if (state.page === "adminCouponManage") html = renderAdminCouponManage();
 	if (state.page === "adminCouponIssue") html = renderAdminCouponIssue();
 	root.innerHTML = html;
+	bindDelegatedPageActions();
 	bindPageActions();
 }
 

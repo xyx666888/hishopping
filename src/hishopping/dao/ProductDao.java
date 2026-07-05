@@ -219,7 +219,6 @@ public class ProductDao {
             ps.setInt(13, p.getMerchantId());
             ps.executeUpdate();
             updateSkuPayload(p);
-            updateSkuPayload(p);
             mediaDao.replaceProductMedia(p.getId(), p.getMediaList());
             bindProductMediaResources(p);
         } catch (SQLException e) {

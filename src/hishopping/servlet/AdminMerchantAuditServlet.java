@@ -43,7 +43,6 @@ public class AdminMerchantAuditServlet extends HttpServlet {
             JsonUtil.write(response, ServletUtil.fail("Please login as admin first."));
             return;
         }
-        Map<String, Object> result = null;
         try {
             String action = request.getParameter("action");
             int merchantId = ServletUtil.intParam(request, "merchantId", 0);
@@ -89,9 +88,9 @@ public class AdminMerchantAuditServlet extends HttpServlet {
             writeRows(response);
             return;
         } catch (RuntimeException e) {
-            JsonUtil.write(response, ServletUtil.fail("Please login as admin first."));
+            JsonUtil.write(response, ServletUtil.fail(e.getMessage() == null ? "操作失败，请稍后重试。" : e.getMessage()));
+            return;
         }
-        JsonUtil.write(response, result);
     }
 
     private void writeRows(HttpServletResponse response) throws IOException {

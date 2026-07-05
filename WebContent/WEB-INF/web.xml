@@ -2,7 +2,8 @@
 <web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
-         version="3.1">
+         version="3.1"
+         metadata-complete="true">
 	<display-name>hishopping 嗨购商城</display-name>
 	<filter>
 		<filter-name>CharacterEncodingFilter</filter-name>
@@ -20,6 +21,19 @@
 		<extension>css</extension>
 		<mime-type>text/css;charset=UTF-8</mime-type>
 	</mime-mapping>
+	<servlet>
+		<servlet-name>default</servlet-name>
+		<servlet-class>org.apache.catalina.servlets.DefaultServlet</servlet-class>
+		<init-param>
+			<param-name>fileEncoding</param-name>
+			<param-value>UTF-8</param-value>
+		</init-param>
+		<init-param>
+			<param-name>listings</param-name>
+			<param-value>false</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
+	</servlet>
 	<welcome-file-list>
 		<welcome-file>index.jsp</welcome-file>
 		<welcome-file>index.html</welcome-file>
@@ -137,6 +151,30 @@
 		<url-pattern>/admin/analytics</url-pattern>
 	</servlet-mapping>
 	<servlet>
+		<servlet-name>AdminCouponServlet</servlet-name>
+		<servlet-class>hishopping.servlet.AdminCouponServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>AdminCouponServlet</servlet-name>
+		<url-pattern>/admin/coupons</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>AdminMerchantAuditServlet</servlet-name>
+		<servlet-class>hishopping.servlet.AdminMerchantAuditServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>AdminMerchantAuditServlet</servlet-name>
+		<url-pattern>/admin/merchants</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>AdminProductAuditServlet</servlet-name>
+		<servlet-class>hishopping.servlet.AdminProductAuditServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>AdminProductAuditServlet</servlet-name>
+		<url-pattern>/admin/productAudit</url-pattern>
+	</servlet-mapping>
+	<servlet>
 		<servlet-name>DbCheckServlet</servlet-name>
 		<servlet-class>hishopping.servlet.DbCheckServlet</servlet-class>
 	</servlet>
@@ -199,12 +237,73 @@
 		<url-pattern>/friends</url-pattern>
 	</servlet-mapping>
 	<servlet>
+		<servlet-name>FavoriteServlet</servlet-name>
+		<servlet-class>hishopping.servlet.FavoriteServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>FavoriteServlet</servlet-name>
+		<url-pattern>/favorites</url-pattern>
+	</servlet-mapping>
+	<servlet>
 		<servlet-name>MerchantAnalyticsServlet</servlet-name>
 		<servlet-class>hishopping.servlet.MerchantAnalyticsServlet</servlet-class>
 	</servlet>
 	<servlet-mapping>
 		<servlet-name>MerchantAnalyticsServlet</servlet-name>
 		<url-pattern>/merchant/analytics</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>MerchantCouponServlet</servlet-name>
+		<servlet-class>hishopping.servlet.MerchantCouponServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>MerchantCouponServlet</servlet-name>
+		<url-pattern>/merchant/coupons</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>MerchantOrderServlet</servlet-name>
+		<servlet-class>hishopping.servlet.MerchantOrderServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>MerchantOrderServlet</servlet-name>
+		<url-pattern>/merchant/orders</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>MerchantProductServlet</servlet-name>
+		<servlet-class>hishopping.servlet.MerchantProductServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>MerchantProductServlet</servlet-name>
+		<url-pattern>/merchant/products</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>MerchantRegisterServlet</servlet-name>
+		<servlet-class>hishopping.servlet.MerchantRegisterServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>MerchantRegisterServlet</servlet-name>
+		<url-pattern>/merchant/register</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>ProductImageUploadServlet</servlet-name>
+		<servlet-class>hishopping.servlet.ProductImageUploadServlet</servlet-class>
+		<multipart-config>
+			<max-file-size>83886080</max-file-size>
+			<max-request-size>94371840</max-request-size>
+			<file-size-threshold>1048576</file-size-threshold>
+		</multipart-config>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>ProductImageUploadServlet</servlet-name>
+		<url-pattern>/merchant/productImage</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>UserCouponServlet</servlet-name>
+		<servlet-class>hishopping.servlet.UserCouponServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>UserCouponServlet</servlet-name>
+		<url-pattern>/user/coupons</url-pattern>
 	</servlet-mapping>
 	<servlet>
 		<servlet-name>AccountRequestServlet</servlet-name>

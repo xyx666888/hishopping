@@ -6,7 +6,7 @@
 	<title>嗨购商城 购物平台</title>
 	<link rel="icon" type="image/png" sizes="64x64" href="assets/img/favicon.png?v=site-logo-20260614">
 	<link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png?v=site-logo-20260614">
-	<link rel="stylesheet" href="assets/css/style.css?v=utf8-login-20260630-fix2">
+	<link rel="stylesheet" href="assets/css/style.css?v=settings-form-20260701-6">
 </head>
 <body>
 	<section id="authPage" class="auth-page">
@@ -87,7 +87,18 @@
 		</div>
 		<button id="logoutBtn" class="logout-btn" type="button">返回登录/注册</button>
 	</section>
+	<script>
+		(function() {
+			var path = window.location.pathname || "";
+			var webContentIndex = path.indexOf("/WebContent/");
+			if (webContentIndex >= 0) {
+				window.HISHOPPING_CONTEXT_PATH = path.slice(0, webContentIndex);
+				return;
+			}
+			window.HISHOPPING_CONTEXT_PATH = path.replace(/\/(?:index\.(?:html|jsp))?$/, "");
+		})();
+	</script>
 	<script charset="UTF-8" src="assets/js/regions-mainland.js?v=utf8-login-20260630"></script>
-	<script charset="UTF-8" src="assets/js/app.js?v=utf8-login-20260630"></script>
+	<script charset="UTF-8" src="assets/js/app.js?v=stability-20260701-11"></script>
 </body>
 </html>
