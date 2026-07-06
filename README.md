@@ -1,7 +1,7 @@
 # 🛒 HiShopping 嗨购商城
 
 > 🎓 一个由在校学生完成的 Java Web 电商实践项目  
-> 💡 我的第一个在 GitHub上的 vibe coding 项目，同时也是一次小组实践作业。
+> 💡 一个相对正式的 vibe coding 项目，同时也是我们小组的实践作品。
 
 ![Java](https://img.shields.io/badge/Java-8%2B-orange?style=flat-square)
 ![Servlet](https://img.shields.io/badge/Servlet-JSP-blue?style=flat-square)
@@ -14,9 +14,9 @@
 
 ## 🙏 写在最前面
 
-我是一名在校学生，这是我第一次在 GitHub 上传自己的 **vibe coding 项目**。
+我是一名在校学生，这是我代表我们整个小组在 GitHub 上传的 **vibe coding 项目**。
 
-这个项目不仅仅是一次个人尝试，也是我们的小组实践作业。由于经验还在积累中，项目中一定还有很多不成熟、不完善、甚至可以被更优雅实现的地方。
+这个项目不仅仅是一次个人尝试，也是我们的小组实践作品。由于经验还在积累中，项目中一定还有很多不成熟、不完善、甚至可以被更优雅实现的地方。
 
 真心希望大家能提出建议、指出问题，也欢迎交流改进思路！✨
 
@@ -116,7 +116,7 @@ WebContent/WEB-INF/web.xml   Web 应用配置
 # 🛒 HiShopping
 
 > 🎓 A Java Web e-commerce practice project created by students  
-> 💡 My first vibe coding project on GitHub, and also a group practice assignment.
+> 💡 A relatively formal vibe coding project, and also our group's practice work.
 
 ![Java](https://img.shields.io/badge/Java-8%2B-orange?style=flat-square)
 ![Servlet](https://img.shields.io/badge/Servlet-JSP-blue?style=flat-square)
@@ -129,9 +129,9 @@ WebContent/WEB-INF/web.xml   Web 应用配置
 
 ## 🙏 Before Everything
 
-I am currently a student, and this is my first time uploading my own **vibe coding project** to GitHub.
+I am currently a student, and this is a **vibe coding project** that I uploaded to GitHub on behalf of our whole group.
 
-This project is not only a personal attempt, but also a group practice assignment. Since I am still learning and gaining experience, there must be many parts that are not mature enough and can be improved.
+This project is not only a personal attempt, but also our group's practice work. Since I am still learning and gaining experience, there must be many parts that are not mature enough and can be improved.
 
 Suggestions, feedback, issues, and improvement ideas are sincerely welcome! ✨
 
