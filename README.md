@@ -26,7 +26,7 @@
 
 **HiShopping 嗨购商城** 是一个基于 **Java Servlet / JSP** 的综合购物商城系统，围绕电商平台的常见业务流程进行设计与实现。
 
-项目包含用户端、商家端和管理员端，尝试模拟一个较完整的线上购物平台，包括商品浏览、购物车、订单、优惠券、VIP 成长体系、商家管理以及后台审核等功能。
+项目包含用户端、商家端和管理员端，尝试模拟一个较完整的线上购物平台，包括商品浏览、规格选择、购物车、订单、优惠券、VIP 成长体系、评价互动、举报处理、商家管理以及后台审核等功能。
 
 ---
 
@@ -34,24 +34,27 @@
 
 ### 👤 用户端
 
-- 用户注册、登录与会话管理
-- 商品浏览、搜索与详情查看
+- 用户注册、登录、验证码校验与会话管理
+- 商品浏览、搜索、详情查看与规格选择
 - 购物车管理
 - 收藏商品
-- 下单与订单管理
+- 下单、订单管理与售后申请
 - 收货地址管理
 - 优惠券领取与使用
 - 积分、成长值与 VIP 等级
-- 商品评价与互动
+- 商品评价、匿名评价、emoji 互动与图片/视频上传
+- 商品、商家、订单和评价举报
+- 我的举报记录与处理进度查看
 
 ### 🏪 商家端
 
-- 商家注册与入驻申请
-- 商品发布与管理
+- 商家注册、验证码校验与入驻申请
+- 商品发布、规格配置、库存与上下架管理
 - 商品图片上传
 - 商家订单处理
 - 优惠券管理
 - 商家数据统计
+- 举报管理：查看自己提交的举报，以及涉及本店商品、订单或评价的举报进度
 
 ### 🛠 管理员端
 
@@ -60,6 +63,8 @@
 - 商品审核
 - 商品、订单、优惠券管理
 - 首页轮播图管理
+- 账号资料、头像、注销与恢复申请审核
+- 举报管理：筛选、查看并处理用户和商家提交的举报
 - 平台运营数据统计
 
 ---
@@ -141,7 +146,7 @@ Suggestions, feedback, issues, and improvement ideas are sincerely welcome! ✨
 
 **HiShopping** is a comprehensive shopping mall system based on **Java Servlet / JSP**.
 
-The project is designed around common e-commerce business workflows. It includes user-side, merchant-side, and administrator-side features, trying to simulate a relatively complete online shopping platform.
+The project is designed around common e-commerce business workflows. It includes user-side, merchant-side, and administrator-side features, trying to simulate a relatively complete online shopping platform with product browsing, specification selection, shopping cart, orders, coupons, VIP growth, review interaction, report handling, merchant management, and admin review workflows.
 
 ---
 
@@ -149,24 +154,27 @@ The project is designed around common e-commerce business workflows. It includes
 
 ### 👤 User Side
 
-- User registration, login, and session management
-- Product browsing, searching, and detail pages
+- User registration, login, captcha verification, and session management
+- Product browsing, searching, detail pages, and specification selection
 - Shopping cart management
 - Product favorites
-- Order creation and order management
+- Order creation, order management, and after-sales requests
 - Address management
 - Coupon collection and usage
 - Points, growth value, and VIP levels
-- Product reviews and interactions
+- Product reviews, anonymous reviews, emoji interaction, and image/video uploads
+- Reporting products, merchants, orders, and reviews
+- Viewing personal report records and handling progress
 
 ### 🏪 Merchant Side
 
-- Merchant registration and application
-- Product publishing and management
+- Merchant registration, captcha verification, and application
+- Product publishing, specification configuration, stock management, and sale status management
 - Product image upload
 - Merchant order processing
 - Coupon management
 - Merchant analytics
+- Report management: viewing reports submitted by the merchant and reports related to the merchant's products, orders, or reviews
 
 ### 🛠 Admin Side
 
@@ -175,6 +183,8 @@ The project is designed around common e-commerce business workflows. It includes
 - Product review
 - Product, order, and coupon management
 - Homepage banner management
+- Account profile, avatar, cancellation, and restoration request review
+- Report management: filtering, viewing, and handling reports submitted by users and merchants
 - Platform analytics
 
 ---
