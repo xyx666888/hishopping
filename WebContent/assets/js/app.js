@@ -85,6 +85,13 @@ var state = {
 	adminOrderStatusFilter: "all",
 	adminOrderKeyword: "",
 	adminSelectedMerchantId: null,
+	reports: [],
+	merchantMyReports: [],
+	merchantRelatedReports: [],
+	adminReports: [],
+	adminReportStatusFilter: "all",
+	adminReportKeyword: "",
+	reportModal: null,
 	addresses: [],
 	selectedAddressId: null,
 	coupons: [],
@@ -128,6 +135,7 @@ var userNavItems = [
 	{ key: "home", label: "购物主页", icon: "assets/img/nav-home.png" },
 	{ key: "cart", label: "购物车", icon: "assets/img/nav-cart.png" },
 	{ key: "orders", label: "订单", icon: "assets/img/nav-orders.png" },
+	{ key: "reports", label: "我的举报", icon: "assets/img/nav-message-icon.png" },
 	{ key: "profile", label: "个人中心", icon: "assets/img/nav-profile.png" },
 	{ key: "messages", label: "我的消息", icon: "assets/img/nav-message-icon.png" },
 	{ key: "vip", label: "VIP中心", icon: "assets/img/nav-vip-center.png?v=nav-vip-tight-20260601" },
@@ -138,6 +146,7 @@ var merchantNavItems = [
 	{ key: "merchantCenter", label: "商家首页", icon: "assets/img/auth-merchant-role.png" },
 	{ key: "merchantProductList", label: "商品管理", icon: "assets/img/nav-detail.png" },
 	{ key: "merchantOrders", label: "订单管理", icon: "assets/img/nav-orders.png" },
+	{ key: "merchantReports", label: "举报管理", icon: "assets/img/nav-message-icon.png" },
 	{ key: "merchantAnalytics", label: "数据分析", icon: "assets/img/nav-hall-display-icon.png" },
 	{ key: "merchantCoupons", label: "店铺优惠券", icon: "assets/img/top-coupon-icon.png" },
 	{ key: "merchantProfile", label: "店铺资料", icon: "assets/img/nav-profile.png" },
@@ -152,6 +161,7 @@ var adminNavItems = [
 	{ key: "adminMerchantAudit", label: "商家管理", icon: "assets/img/auth-merchant-role.png" },
 	{ key: "adminUsers", label: "用户管理", icon: "assets/img/nav-profile.png" },
 	{ key: "adminOrders", label: "订单管理", icon: "assets/img/nav-orders.png" },
+	{ key: "adminReports", label: "举报管理", icon: "assets/img/nav-message-icon.png" },
 	{ key: "adminAnalytics", label: "数据分析", icon: "assets/img/nav-hall-display-icon.png" },
 	{ key: "adminCouponCenter", label: "优惠券管理", icon: "assets/img/top-coupon-icon.png" }
 ];
@@ -167,7 +177,10 @@ var pageTitles = {
 	adminHall: "大厅展示"
 	, adminAccountRequests: "资料审核",
 	merchantAnalytics: "数据分析",
-	adminAnalytics: "数据分析"
+	adminAnalytics: "数据分析",
+	reports: "我的举报",
+	merchantReports: "举报管理",
+	adminReports: "举报管理"
 };
 
 function activeNavItems() {
@@ -179,6 +192,7 @@ function pageTitleText(page) {
 		home: "购物主页",
 		cart: "购物车",
 		orders: "我的订单",
+		reports: "我的举报",
 		profile: "个人中心",
 		favorites: "我的收藏",
 		coupons: "我的优惠券",
@@ -954,9 +968,11 @@ function loadPageData(page) {
 	if (page === "detail") return Promise.all([state.selectedProduct ? loadProductReviews(state.selectedProduct.id) : Promise.resolve(), state.user ? loadOrders() : Promise.resolve()]);
 	if (page === "cart") return Promise.all([loadCart(), loadUserCoupons(), loadFavorites()]);
 	if (page === "orders") return loadOrders();
+	if (page === "reports") return loadReports();
 	if (page === "address") return loadAddresses();
 	if (page === "profile") return Promise.all([loadAccountRequests(false), loadReviewStats()]);
 	if (page === "settings" || page === "merchantProfile") return loadAccountRequests(false);
+	if (page === "merchantReports") return loadMerchantReports();
 	if (page === "merchantAnalytics") return loadMerchantAnalytics();
 	if (isMerchantPage(page)) return loadMerchantProducts();
 	if (page === "adminHall") return loadHallBanners(true);
@@ -967,6 +983,7 @@ function loadPageData(page) {
 		]);
 	}
 	if (page === "adminAccountRequests") return loadAccountRequests(true);
+	if (page === "adminReports") return loadAdminReports();
 	if (page === "adminAnalytics") return loadAdminAnalytics();
 	if (isAdminPage(page)) return loadAdminProducts();
 	if (page === "coupons") return loadUserCoupons();
@@ -1416,7 +1433,7 @@ function renderProductReviews(product) {
 			(sku ? '<div class="review-sku">' + escapeHtml(sku) + '</div>' : '') +
 			'<p>' + escapeHtml(review.content || "这位用户上传了图片/视频，没有填写文字评价。") + '</p>' +
 			(media ? '<div class="review-media-grid">' + media + '</div>' : '') +
-			'<div class="review-actions"><button class="ghost-btn review-like ' + (review.liked ? "active" : "") + '" data-id="' + reviewId + '" type="button">赞 <span>' + Number(review.likeCount || 0) + '</span></button><button class="ghost-btn review-reply-open" data-id="' + reviewId + '" type="button">回复</button></div>' +
+			'<div class="review-actions"><button class="ghost-btn review-like ' + (review.liked ? "active" : "") + '" data-id="' + reviewId + '" type="button">赞 <span>' + Number(review.likeCount || 0) + '</span></button><button class="ghost-btn review-reply-open" data-id="' + reviewId + '" type="button">回复</button><button class="ghost-btn open-report" data-target-role="REVIEW" data-target-id="' + reviewId + '" data-review-id="' + reviewId + '" data-product-id="' + (review.productId || (product && product.id) || 0) + '" data-report-type="恶意评价" type="button">举报评价</button></div>' +
 			(replies ? '<div class="review-replies">' + replies + '</div>' : '') + replyForm + '</div></article>';
 	}).join("") || '<div class="empty-cart compact-empty"><h3>暂无评价</h3><p class="muted">完成订单后可以发表真实评价，帮助其他用户判断这件商品是否适合自己。</p></div>';
 	var options = state.user ? reviewableOrderOptions(product.id) : "";
@@ -1555,6 +1572,7 @@ function renderDetail() {
 	var soldOut = !sku || sku.enabled === false || stock <= 0;
 	var subtotal = Number(sku && sku.price || product.price || 0) * state.detailQuantity;
 	var contactBtn = product.merchantId ? '<button class="ghost-btn detail-contact-merchant" data-merchant="' + product.merchantId + '" data-product="' + product.id + '" type="button">联系商家</button>' : '<button class="ghost-btn detail-contact-admin" data-product="' + product.id + '" type="button">联系平台</button>';
+	var reportBtns = state.user ? '<button class="ghost-btn open-report" data-target-role="PRODUCT" data-target-id="' + product.id + '" data-product-id="' + product.id + '" data-merchant-id="' + (product.merchantId || 0) + '" data-report-type="商品违规" type="button">举报商品</button>' + (product.merchantId ? '<button class="ghost-btn open-report" data-target-role="MERCHANT" data-target-id="' + product.merchantId + '" data-merchant-id="' + product.merchantId + '" data-report-type="商家违规" type="button">举报商家</button>' : '') : "";
 	return '<div class="detail-page-head"><button class="detail-back-btn" type="button" title="返回"><img src="assets/img/back-return.png" alt="返回"></button><div><h2>商品详情</h2><p>查看规格、库存、优惠和店铺信息。</p></div></div><div class="detail-grid"><div class="panel-card detail-media-panel">' + productMediaCarousel(product) +
 		renderProductDisplayAttrs(product) + '<div class="detail-benefits"><span>正品保障</span><span>极速发货</span><span>7天无理由</span></div></div>' +
 		'<div class="panel-card detail-info"><div class="detail-title-actions"><div>' + badge(product.tag) + ' ' + badge("销量 " + product.sales, "green") + ' ' + badge("评分 " + product.rating, "amber") + '</div>' + favoriteButton(product.id, "detail-favorite") + '</div>' +
@@ -1564,7 +1582,7 @@ function renderDetail() {
 		attrHtml +
 		'<div class="detail-purchase"><strong>数量</strong><div class="qty"><button class="detail-qty" data-delta="-1" type="button">-</button><b>' + state.detailQuantity + '</b><button class="detail-qty" data-delta="1" type="button" ' + (state.detailQuantity >= stock ? "disabled" : "") + '>+</button></div><span class="muted">已选：' + escapeHtml(skuText(sku) || "默认") + ' · ' + money(sku ? sku.price : product.price) + ' × ' + state.detailQuantity + ' = ' + money(subtotal) + '</span></div>' +
 		(soldOut ? '<p class="muted sku-warning">当前规格暂无库存，请选择其他规格。</p>' : '') +
-		'<div class="dual-actions"><button class="primary-btn detail-add-cart" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>加入购物车</button><button class="ghost-btn detail-buy-now" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>立即购买</button>' + contactBtn + '</div></div></div>' + renderProductReviews(product);
+		'<div class="dual-actions"><button class="primary-btn detail-add-cart" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>加入购物车</button><button class="ghost-btn detail-buy-now" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>立即购买</button>' + contactBtn + reportBtns + '</div></div></div>' + renderProductReviews(product);
 }
 
 function renderCart() {
@@ -1649,7 +1667,8 @@ function renderOrders() {
 		var batchText = order.batchNo ? '<p class="muted">同批次下单：' + escapeHtml(order.batchNo) + '</p>' : "";
 		var consultMerchant = order.merchantId ? '<button class="ghost-btn order-contact-merchant" data-merchant="' + order.merchantId + '" data-order="' + order.id + '" type="button">咨询商家</button>' : "";
 		var consultAdmin = '<button class="ghost-btn order-contact-admin" data-order="' + order.id + '" type="button">联系平台</button>';
-		return '<article class="order-card"><div class="order-top"><div><span class="muted">' + escapeHtml(order.orderNo) + '</span><h3>' + escapeHtml(order.shopName || "平台自营") + '</h3><p class="order-items-text">' + items + '</p>' + batchText + '<p class="muted">下单时间：' + escapeHtml(order.createTime) + '</p><p class="muted">收货地址：' + escapeHtml(order.receiverAddress) + '</p>' + (logistics ? '<p class="muted">物流信息：' + logistics + '</p>' : '') + '<p class="muted">商品总额：' + money(orderOriginAmount(order)) + ' · 优惠：-' + money(order.discountAmount || 0) + '</p></div><div style="text-align:right;">' + badge(order.status, tone) + '<div class="price" style="margin-top:10px;">' + money(order.totalAmount) + '</div></div></div><div class="order-actions">' + payBtn + confirmBtn + cancelBtn + consultMerchant + consultAdmin + afterSaleBtns + reviewBtns + '<button class="ghost-btn rebuy-order" data-id="' + order.id + '" type="button">再次购买</button></div></article>';
+		var reportOrderBtn = '<button class="ghost-btn open-report" data-target-role="ORDER" data-target-id="' + order.id + '" data-order-id="' + order.id + '" data-merchant-id="' + (order.merchantId || 0) + '" data-report-type="订单纠纷" type="button">举报订单</button>';
+		return '<article class="order-card"><div class="order-top"><div><span class="muted">' + escapeHtml(order.orderNo) + '</span><h3>' + escapeHtml(order.shopName || "平台自营") + '</h3><p class="order-items-text">' + items + '</p>' + batchText + '<p class="muted">下单时间：' + escapeHtml(order.createTime) + '</p><p class="muted">收货地址：' + escapeHtml(order.receiverAddress) + '</p>' + (logistics ? '<p class="muted">物流信息：' + logistics + '</p>' : '') + '<p class="muted">商品总额：' + money(orderOriginAmount(order)) + ' · 优惠：-' + money(order.discountAmount || 0) + '</p></div><div style="text-align:right;">' + badge(order.status, tone) + '<div class="price" style="margin-top:10px;">' + money(order.totalAmount) + '</div></div></div><div class="order-actions">' + payBtn + confirmBtn + cancelBtn + consultMerchant + consultAdmin + afterSaleBtns + reviewBtns + reportOrderBtn + '<button class="ghost-btn rebuy-order" data-id="' + order.id + '" type="button">再次购买</button></div></article>';
 	}).join("");
 }
 
@@ -1667,6 +1686,7 @@ function renderProfile() {
 	var actions = [
 		["VIP中心", "查看等级规则、权益和成长方式", "vip"],
 		["我的订单", "查看全部订单与物流状态", "orders"],
+		["我的举报", "查看提交给平台的举报处理进度", "reports"],
 		["我的收藏", "查看收藏商品，快速回到详情", "favorites"],
 		["我的优惠券", "查看已领取优惠券和可用门槛", "coupons"],
 		["地址管理", "维护收货地址与默认地址", "address"],
@@ -2030,7 +2050,8 @@ function renderMerchantOrders() {
 	var rows = merchantOrderRows().map(function(order) {
 		var canShip = order.status === "待发货";
 		var afterSales = (order.afterSales || []).map(function(a) { return '#' + a.afterSaleId + ' 商品' + a.productId + ' ' + escapeHtml(a.status || ""); }).join("<br>") || "-";
-		return '<tr><td><b>' + escapeHtml(order.orderNo) + '</b><p class="muted">' + escapeHtml(order.createTime || "") + '</p>' + (order.batchNo ? '<p class="muted">批次：' + escapeHtml(order.batchNo) + '</p>' : '') + '</td><td>' + orderItemsSummary(order) + '</td><td>用户 ' + escapeHtml(order.userId) + '</td><td>' + escapeHtml(order.receiverName || "") + '<p class="muted">' + escapeHtml(order.receiverPhone || "") + '</p></td><td>' + escapeHtml(order.receiverAddress || "") + '</td><td>' + (shipmentSummary(order) || "-") + '</td><td>' + afterSales + '</td><td><b>' + money(order.totalAmount) + '</b><p class="muted">商品 ' + money(orderOriginAmount(order)) + '</p></td><td>' + badge(order.status, order.status === "已完成" ? "green" : (order.status === "已取消" ? "red" : "amber")) + '</td><td><button class="primary-btn merchant-order-ship" data-id="' + order.id + '" type="button" ' + (canShip ? "" : "disabled") + '>发货</button></td></tr>';
+		var reportUser = '<button class="ghost-btn open-report" data-target-role="USER" data-target-id="' + order.userId + '" data-order-id="' + order.id + '" data-merchant-id="' + (order.merchantId || 0) + '" data-report-type="用户违规" type="button">举报用户</button>';
+		return '<tr><td><b>' + escapeHtml(order.orderNo) + '</b><p class="muted">' + escapeHtml(order.createTime || "") + '</p>' + (order.batchNo ? '<p class="muted">批次：' + escapeHtml(order.batchNo) + '</p>' : '') + '</td><td>' + orderItemsSummary(order) + '</td><td>用户 ' + escapeHtml(order.userId) + '</td><td>' + escapeHtml(order.receiverName || "") + '<p class="muted">' + escapeHtml(order.receiverPhone || "") + '</p></td><td>' + escapeHtml(order.receiverAddress || "") + '</td><td>' + (shipmentSummary(order) || "-") + '</td><td>' + afterSales + '</td><td><b>' + money(order.totalAmount) + '</b><p class="muted">商品 ' + money(orderOriginAmount(order)) + '</p></td><td>' + badge(order.status, order.status === "已完成" ? "green" : (order.status === "已取消" ? "red" : "amber")) + '</td><td><button class="primary-btn merchant-order-ship" data-id="' + order.id + '" type="button" ' + (canShip ? "" : "disabled") + '>发货</button>' + reportUser + '</td></tr>';
 	}).join("") || '<tr><td colspan="11">暂无匹配订单。</td></tr>';
 	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>订单管理</h2><p>仅展示本店商品相关订单，待发货订单可由商家填写物流发货。</p></div><select class="admin-input compact-select" id="merchantOrderStatusFilter"><option value="all">全部状态</option>' + statuses.map(function(status) { return '<option value="' + status + '" ' + (state.merchantOrderStatusFilter === status ? "selected" : "") + '>' + status + '</option>'; }).join("") + '</select></div><div class="admin-table tall merchant-orders-table"><table><thead><tr><th>订单编号</th><th>本店商品</th><th>买家</th><th>收货人</th><th>收货地址</th><th>物流</th><th>售后</th><th>本店金额</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
 }
@@ -2346,6 +2367,46 @@ function bindProductAttrsEditor() {
 			if (row) row.parentNode.removeChild(row);
 			if (!document.querySelector(".product-attr-row")) updateProductAttrsEditor([]);
 		};
+	});
+}
+
+function loadReports() {
+	if (!state.user && !state.merchant) {
+		state.reports = [];
+		return Promise.resolve();
+	}
+	return get("reports?action=my").then(function(data) {
+		if (data.success) state.reports = data.reports || [];
+		else state.reports = [];
+	});
+}
+
+function loadMerchantReports() {
+	if (!state.merchant) {
+		state.merchantMyReports = [];
+		state.merchantRelatedReports = [];
+		return Promise.resolve();
+	}
+	return get("merchant/reports?action=list").then(function(data) {
+		if (data.success) {
+			state.merchantMyReports = data.myReports || [];
+			state.merchantRelatedReports = data.relatedReports || [];
+		} else {
+			state.merchantMyReports = [];
+			state.merchantRelatedReports = [];
+		}
+	});
+}
+
+function loadAdminReports() {
+	if (!state.admin) {
+		state.adminReports = [];
+		return Promise.resolve();
+	}
+	var query = "admin/reports?action=list&status=" + encodeURIComponent(state.adminReportStatusFilter || "all") + "&keyword=" + encodeURIComponent(state.adminReportKeyword || "");
+	return get(query).then(function(data) {
+		if (data.success) state.adminReports = data.reports || [];
+		else state.adminReports = [];
 	});
 }
 
@@ -2813,6 +2874,84 @@ function renderAdmin() {
 	if (state.page === "adminOrders") return renderAdminOrderManage();
 	return '<section class="admin-stats">' + stats + '</section>' + userSection;
 }
+
+function reportRoleText(role) {
+	if (role === "MERCHANT") return "商家";
+	if (role === "ADMIN") return "管理员";
+	if (role === "PRODUCT") return "商品";
+	if (role === "ORDER") return "订单";
+	if (role === "REVIEW") return "评价";
+	return "用户";
+}
+
+function reportStatusText(status) {
+	if (status === "PROCESSING") return "处理中";
+	if (status === "APPROVED") return "已通过";
+	if (status === "REJECTED") return "已驳回";
+	if (status === "CLOSED") return "已关闭";
+	return "待处理";
+}
+
+function reportStatusTone(status) {
+	if (status === "APPROVED") return "green";
+	if (status === "REJECTED" || status === "CLOSED") return "red";
+	if (status === "PROCESSING") return "amber";
+	return "";
+}
+
+function reportRows(reports, adminMode) {
+	return (reports || []).map(function(r) {
+		var reason = String(r.reason || "");
+		var summary = reason.length > 42 ? reason.slice(0, 42) + "..." : reason;
+		var actions = adminMode ? '<button class="ghost-btn admin-report-view" data-id="' + r.reportId + '" type="button">查看</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="PROCESSING" type="button">处理中</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="APPROVED" type="button">通过</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="REJECTED" type="button">驳回</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="CLOSED" type="button">关闭</button>' : '<span class="muted">' + escapeHtml(r.handleOpinion || "等待平台处理") + '</span>';
+		return '<tr><td>#' + r.reportId + '</td><td>' + reportRoleText(r.reporterRole) + '<p class="muted">' + escapeHtml(r.reporterName || "") + '</p></td><td>' + reportRoleText(r.targetRole) + '<p class="muted">' + escapeHtml(r.targetName || ("#" + r.targetId)) + '</p></td><td>' + escapeHtml(r.reportType || "") + '</td><td>' + escapeHtml(summary) + '</td><td>' + badge(reportStatusText(r.status), reportStatusTone(r.status)) + '</td><td>' + escapeHtml(shortDate(r.createTime || "")) + '</td><td class="report-actions">' + actions + '</td></tr>';
+	}).join("");
+}
+
+function renderReportTable(reports, adminMode, emptyText) {
+	var rows = reportRows(reports, adminMode) || '<tr><td colspan="8">' + escapeHtml(emptyText || "暂无举报记录。") + '</td></tr>';
+	return '<div class="admin-table report-table"><table><thead><tr><th>编号</th><th>举报人</th><th>对象</th><th>类型</th><th>原因摘要</th><th>状态</th><th>提交时间</th><th>操作/处理意见</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderReports() {
+	if (!state.user && !state.merchant) return '<div class="empty-cart"><h3>请先登录</h3><p class="muted">登录后可以查看自己提交的举报。</p></div>';
+	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>我的举报</h2><p>这里展示你提交给平台处理的举报及最新处理意见。</p></div></div>' + renderReportTable(state.reports, false, "暂无举报记录。") + '</section>';
+}
+
+function renderMerchantReports() {
+	var my = renderReportTable(state.merchantMyReports, false, "暂无我提交的举报。");
+	var related = renderReportTable(state.merchantRelatedReports, false, "暂无涉及本店的举报。");
+	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>举报管理</h2><p>商家可查看自己提交的举报，以及用户举报本店、商品、订单或评价的处理进度。</p></div></div><div class="report-split"><section><h3>我提交的举报</h3>' + my + '</section><section><h3>涉及本店的举报</h3>' + related + '</section></div></section>';
+}
+
+function renderAdminReports() {
+	var statuses = ["all", "PENDING", "PROCESSING", "APPROVED", "REJECTED", "CLOSED"];
+	var options = statuses.map(function(status) {
+		var text = status === "all" ? "全部状态" : reportStatusText(status);
+		return '<option value="' + status + '" ' + (state.adminReportStatusFilter === status ? "selected" : "") + '>' + text + '</option>';
+	}).join("");
+	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>举报管理</h2><p>统一筛选、查看并处理用户和商家提交的举报。</p></div></div><div class="admin-user-toolbar"><label class="field"><span>状态</span><select id="adminReportStatusFilter">' + options + '</select></label><label class="field"><span>搜索</span><input id="adminReportKeyword" value="' + escapeHtml(state.adminReportKeyword || "") + '" placeholder="举报人、对象、类型、原因"></label></div>' + renderReportTable(state.adminReports, true, "暂无匹配举报。") + '</section>';
+}
+
+function renderReportModal() {
+	var modal = state.reportModal;
+	if (!modal) return "";
+	var label = reportRoleText(modal.targetRole) + " #" + modal.targetId;
+	var typeOptions = ["商品违规", "商家违规", "用户违规", "恶意评价", "订单纠纷", "其他"].map(function(item) {
+		return '<option value="' + item + '" ' + (item === modal.reportType ? "selected" : "") + '>' + item + '</option>';
+	}).join("");
+	return '<div class="report-modal-backdrop"><form class="report-modal" id="reportForm"><div class="section-head"><div><h2>提交举报</h2><p>' + escapeHtml(label) + '</p></div><button class="ghost-btn report-modal-close" type="button">关闭</button></div><label class="field"><span>举报类型</span><select id="reportType">' + typeOptions + '</select></label><label class="field wide"><span>举报原因</span><input id="reportReason" placeholder="请简要说明举报原因"></label><label class="field wide"><span>详细说明</span><textarea id="reportDescription" rows="4" placeholder="补充时间、订单、沟通情况等信息"></textarea></label><label class="field wide"><span>证据链接/图片地址</span><input id="reportEvidenceUrls" placeholder="多个链接可用逗号分隔"></label><div class="form-actions"><button class="ghost-btn report-modal-close" type="button">取消</button><button class="primary-btn" type="submit">提交举报</button></div></form></div>';
+}
+
+function openReportModal(options) {
+	if (!state.user && !state.merchant) {
+		alert("请先登录后提交举报。");
+		return;
+	}
+	state.reportModal = options || null;
+	renderPage();
+}
+
 function bindChatEvents() {
 	Array.prototype.forEach.call(document.querySelectorAll(".conversation-item"), function(btn) {
 		btn.onclick = function() {
@@ -3180,6 +3319,103 @@ function scrollChatToBottom() {
 }
 
 function bindPageActions() {
+	Array.prototype.forEach.call(document.querySelectorAll(".open-report"), function(btn) {
+		btn.onclick = function() {
+			openReportModal({
+				targetRole: btn.getAttribute("data-target-role"),
+				targetId: Number(btn.getAttribute("data-target-id") || 0),
+				reportType: btn.getAttribute("data-report-type") || "其他",
+				merchantId: Number(btn.getAttribute("data-merchant-id") || 0),
+				orderId: Number(btn.getAttribute("data-order-id") || 0),
+				productId: Number(btn.getAttribute("data-product-id") || 0),
+				reviewId: Number(btn.getAttribute("data-review-id") || 0)
+			});
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".report-modal-close"), function(btn) {
+		btn.onclick = function() {
+			state.reportModal = null;
+			renderPage();
+		};
+	});
+	var reportForm = document.getElementById("reportForm");
+	if (reportForm) {
+		reportForm.onsubmit = function(e) {
+			e.preventDefault();
+			var modal = state.reportModal || {};
+			var reason = document.getElementById("reportReason").value.trim();
+			if (!reason) {
+				alert("请填写举报原因。");
+				return;
+			}
+			post("reports", {
+				action: "create",
+				targetRole: modal.targetRole,
+				targetId: modal.targetId,
+				reportType: document.getElementById("reportType").value,
+				reason: reason,
+				description: document.getElementById("reportDescription").value,
+				evidenceUrls: document.getElementById("reportEvidenceUrls").value,
+				merchantId: modal.merchantId || 0,
+				orderId: modal.orderId || 0,
+				productId: modal.productId || 0,
+				reviewId: modal.reviewId || 0
+			}).then(function(data) {
+				if (!data.success) { alert(data.message || "举报提交失败"); return; }
+				state.reportModal = null;
+				state.reports = data.reports || state.reports || [];
+				showToast("举报已提交");
+				if (state.page === "reports") loadReports().then(renderPage);
+				else if (state.page === "merchantReports") loadMerchantReports().then(renderPage);
+				else renderPage();
+			});
+		};
+	}
+	var adminReportStatusFilter = document.getElementById("adminReportStatusFilter");
+	if (adminReportStatusFilter) {
+		adminReportStatusFilter.onchange = function() {
+			state.adminReportStatusFilter = adminReportStatusFilter.value;
+			loadAdminReports().then(renderPage);
+		};
+	}
+	var adminReportKeyword = document.getElementById("adminReportKeyword");
+	if (adminReportKeyword) {
+		var reportSearchTimer = null;
+		adminReportKeyword.oninput = function() {
+			state.adminReportKeyword = adminReportKeyword.value;
+			clearTimeout(reportSearchTimer);
+			reportSearchTimer = setTimeout(function() { loadAdminReports().then(renderPage); }, 220);
+		};
+	}
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-view"), function(btn) {
+		btn.onclick = function() {
+			var report = (state.adminReports || []).filter(function(item) { return String(item.reportId) === String(btn.getAttribute("data-id")); })[0];
+			if (!report) return;
+			alert("举报 #" + report.reportId + "\n对象：" + reportRoleText(report.targetRole) + " " + (report.targetName || report.targetId) + "\n原因：" + (report.reason || "") + "\n说明：" + (report.description || "") + "\n处理意见：" + (report.handleOpinion || ""));
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-handle"), function(btn) {
+		btn.onclick = function() {
+			var status = btn.getAttribute("data-status");
+			var opinion = prompt("请输入处理意见", reportStatusText(status));
+			if (opinion == null) return;
+			var result = prompt("请输入处理结果", reportStatusText(status)) || "";
+			post("admin/reports", {
+				action: "handle",
+				reportId: btn.getAttribute("data-id"),
+				status: status,
+				handleOpinion: opinion,
+				handleResult: result,
+				filterStatus: state.adminReportStatusFilter || "all",
+				keyword: state.adminReportKeyword || ""
+			}).then(function(data) {
+				if (!data.success) { alert(data.message || "处理失败"); return; }
+				state.adminReports = data.reports || [];
+				showToast("举报状态已更新");
+				renderPage();
+			});
+		};
+	});
 	Array.prototype.forEach.call(document.querySelectorAll(".add-cart,.buy-now"), function(btn) {
 		btn.onclick = function() { addToCart(Number(btn.getAttribute("data-id")), btn.classList.contains("buy-now")); };
 	});
@@ -4842,6 +5078,7 @@ function renderPage() {
 	if (state.page === "detail") html = renderDetail();
 	if (state.page === "cart") html = renderCart();
 	if (state.page === "orders") html = renderOrders();
+	if (state.page === "reports") html = renderReports();
 	if (state.page === "profile") html = renderProfile();
 	if (state.page === "favorites") html = renderFavorites();
 	if (state.page === "settings") html = renderSettings();
@@ -4853,6 +5090,7 @@ function renderPage() {
 	if (state.page === "merchantProductList") html = renderMerchantProductList();
 	if (state.page === "merchantProductAdd") html = renderMerchantProductForm();
 	if (state.page === "merchantOrders") html = renderMerchantOrders();
+	if (state.page === "merchantReports") html = renderMerchantReports();
 	if (state.page === "merchantAnalytics") html = renderMerchantAnalytics();
 	if (state.page === "merchantCoupons") html = renderMerchantCoupons();
 	if (state.page === "merchantProfile") html = renderMerchantProfile();
@@ -4861,11 +5099,12 @@ function renderPage() {
 	if (state.page === "adminHall") html = renderAdminHall();
 	if (state.page === "adminAccountRequests") html = renderAdminAccountRequests();
 	if (state.page === "adminMerchantAudit") html = renderAdminMerchantAudit();
+	if (state.page === "adminReports") html = renderAdminReports();
 	if (state.page === "adminAnalytics") html = renderAdminAnalytics();
 	if (state.page === "adminCouponCenter") html = renderAdminCouponCenter();
 	if (state.page === "adminCouponManage") html = renderAdminCouponManage();
 	if (state.page === "adminCouponIssue") html = renderAdminCouponIssue();
-	root.innerHTML = html;
+	root.innerHTML = html + renderReportModal();
 	bindDelegatedPageActions();
 	bindPageActions();
 }

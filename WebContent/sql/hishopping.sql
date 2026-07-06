@@ -867,6 +867,108 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_product_review
     EXEC(N'CREATE INDEX IX_hishop_product_review_media_owner ON dbo.hishop_product_review_media(owner_type, owner_id, status, create_time DESC);');
 GO
 
+IF OBJECT_ID(N'dbo.hishop_report', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.hishop_report (
+        report_id INT IDENTITY(1,1) PRIMARY KEY,
+        reporter_role NVARCHAR(20) NOT NULL,
+        reporter_id INT NOT NULL,
+        reporter_name NVARCHAR(100) NULL,
+        target_role NVARCHAR(20) NOT NULL,
+        target_id INT NOT NULL,
+        target_name NVARCHAR(160) NULL,
+        merchant_id INT NULL,
+        user_id INT NULL,
+        order_id INT NULL,
+        product_id INT NULL,
+        review_id INT NULL,
+        report_type NVARCHAR(60) NOT NULL,
+        reason NVARCHAR(300) NOT NULL,
+        description NVARCHAR(1000) NULL,
+        evidence_urls NVARCHAR(MAX) NULL,
+        status NVARCHAR(20) NOT NULL CONSTRAINT DF_hishop_report_status DEFAULT N'PENDING',
+        admin_id INT NULL,
+        admin_name NVARCHAR(100) NULL,
+        handle_opinion NVARCHAR(500) NULL,
+        handle_result NVARCHAR(500) NULL,
+        create_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_report_create_time DEFAULT SYSDATETIME(),
+        update_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_report_update_time DEFAULT SYSDATETIME(),
+        handle_time DATETIME2 NULL
+    );
+END
+GO
+
+IF COL_LENGTH('dbo.hishop_report', 'reporter_role') IS NULL
+    ALTER TABLE dbo.hishop_report ADD reporter_role NVARCHAR(20) NOT NULL CONSTRAINT DF_hishop_report_reporter_role DEFAULT N'USER';
+IF COL_LENGTH('dbo.hishop_report', 'reporter_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD reporter_id INT NOT NULL CONSTRAINT DF_hishop_report_reporter_id DEFAULT 0;
+IF COL_LENGTH('dbo.hishop_report', 'reporter_name') IS NULL
+    ALTER TABLE dbo.hishop_report ADD reporter_name NVARCHAR(100) NULL;
+IF COL_LENGTH('dbo.hishop_report', 'target_role') IS NULL
+    ALTER TABLE dbo.hishop_report ADD target_role NVARCHAR(20) NOT NULL CONSTRAINT DF_hishop_report_target_role DEFAULT N'PRODUCT';
+IF COL_LENGTH('dbo.hishop_report', 'target_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD target_id INT NOT NULL CONSTRAINT DF_hishop_report_target_id DEFAULT 0;
+IF COL_LENGTH('dbo.hishop_report', 'target_name') IS NULL
+    ALTER TABLE dbo.hishop_report ADD target_name NVARCHAR(160) NULL;
+IF COL_LENGTH('dbo.hishop_report', 'merchant_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD merchant_id INT NULL;
+IF COL_LENGTH('dbo.hishop_report', 'user_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD user_id INT NULL;
+IF COL_LENGTH('dbo.hishop_report', 'order_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD order_id INT NULL;
+IF COL_LENGTH('dbo.hishop_report', 'product_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD product_id INT NULL;
+IF COL_LENGTH('dbo.hishop_report', 'review_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD review_id INT NULL;
+IF COL_LENGTH('dbo.hishop_report', 'report_type') IS NULL
+    ALTER TABLE dbo.hishop_report ADD report_type NVARCHAR(60) NOT NULL CONSTRAINT DF_hishop_report_report_type DEFAULT N'其他';
+IF COL_LENGTH('dbo.hishop_report', 'reason') IS NULL
+    ALTER TABLE dbo.hishop_report ADD reason NVARCHAR(300) NOT NULL CONSTRAINT DF_hishop_report_reason DEFAULT N'';
+IF COL_LENGTH('dbo.hishop_report', 'description') IS NULL
+    ALTER TABLE dbo.hishop_report ADD description NVARCHAR(1000) NULL;
+IF COL_LENGTH('dbo.hishop_report', 'evidence_urls') IS NULL
+    ALTER TABLE dbo.hishop_report ADD evidence_urls NVARCHAR(MAX) NULL;
+IF COL_LENGTH('dbo.hishop_report', 'status') IS NULL
+    ALTER TABLE dbo.hishop_report ADD status NVARCHAR(20) NOT NULL CONSTRAINT DF_hishop_report_status_compat DEFAULT N'PENDING';
+IF COL_LENGTH('dbo.hishop_report', 'admin_id') IS NULL
+    ALTER TABLE dbo.hishop_report ADD admin_id INT NULL;
+IF COL_LENGTH('dbo.hishop_report', 'admin_name') IS NULL
+    ALTER TABLE dbo.hishop_report ADD admin_name NVARCHAR(100) NULL;
+IF COL_LENGTH('dbo.hishop_report', 'handle_opinion') IS NULL
+    ALTER TABLE dbo.hishop_report ADD handle_opinion NVARCHAR(500) NULL;
+IF COL_LENGTH('dbo.hishop_report', 'handle_result') IS NULL
+    ALTER TABLE dbo.hishop_report ADD handle_result NVARCHAR(500) NULL;
+IF COL_LENGTH('dbo.hishop_report', 'create_time') IS NULL
+    ALTER TABLE dbo.hishop_report ADD create_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_report_create_time_compat DEFAULT SYSDATETIME();
+IF COL_LENGTH('dbo.hishop_report', 'update_time') IS NULL
+    ALTER TABLE dbo.hishop_report ADD update_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_report_update_time_compat DEFAULT SYSDATETIME();
+IF COL_LENGTH('dbo.hishop_report', 'handle_time') IS NULL
+    ALTER TABLE dbo.hishop_report ADD handle_time DATETIME2 NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_status_time' AND object_id = OBJECT_ID(N'dbo.hishop_report'))
+    EXEC(N'CREATE INDEX IX_hishop_report_status_time ON dbo.hishop_report(status, create_time DESC);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_reporter' AND object_id = OBJECT_ID(N'dbo.hishop_report'))
+    EXEC(N'CREATE INDEX IX_hishop_report_reporter ON dbo.hishop_report(reporter_role, reporter_id, create_time DESC);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_target' AND object_id = OBJECT_ID(N'dbo.hishop_report'))
+    EXEC(N'CREATE INDEX IX_hishop_report_target ON dbo.hishop_report(target_role, target_id);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_merchant' AND object_id = OBJECT_ID(N'dbo.hishop_report'))
+    EXEC(N'CREATE INDEX IX_hishop_report_merchant ON dbo.hishop_report(merchant_id, create_time DESC);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_user' AND object_id = OBJECT_ID(N'dbo.hishop_report'))
+    EXEC(N'CREATE INDEX IX_hishop_report_user ON dbo.hishop_report(user_id, create_time DESC);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_order' AND object_id = OBJECT_ID(N'dbo.hishop_report'))
+    EXEC(N'CREATE INDEX IX_hishop_report_order ON dbo.hishop_report(order_id, create_time DESC);');
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.hishop_report WHERE reason = N'演示举报记录')
+BEGIN
+    INSERT INTO dbo.hishop_report(reporter_role, reporter_id, reporter_name, target_role, target_id, target_name, merchant_id, user_id, product_id, report_type, reason, description, status)
+    SELECT TOP 1 N'USER', u.id, u.username, N'PRODUCT', p.id, p.name, p.merchant_id, u.id, p.id, N'商品违规', N'演示举报记录', N'这是举报模块的演示数据，可重复执行脚本且不会重复插入。', N'PENDING'
+    FROM dbo.hishopping_user u CROSS JOIN dbo.hishopping_product p
+    ORDER BY u.id, p.id;
+END
+GO
+
 IF OBJECT_ID(N'dbo.hishop_growth_log', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.hishop_growth_log (

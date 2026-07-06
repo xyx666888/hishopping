@@ -339,6 +339,30 @@
 		<url-pattern>/admin/accountRequests</url-pattern>
 	</servlet-mapping>
 	<servlet>
+		<servlet-name>ReportServlet</servlet-name>
+		<servlet-class>hishopping.servlet.ReportServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>ReportServlet</servlet-name>
+		<url-pattern>/reports</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>MerchantReportServlet</servlet-name>
+		<servlet-class>hishopping.servlet.MerchantReportServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>MerchantReportServlet</servlet-name>
+		<url-pattern>/merchant/reports</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>AdminReportServlet</servlet-name>
+		<servlet-class>hishopping.servlet.AdminReportServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>AdminReportServlet</servlet-name>
+		<url-pattern>/admin/reports</url-pattern>
+	</servlet-mapping>
+	<servlet>
 		<servlet-name>AvatarUploadServlet</servlet-name>
 		<servlet-class>hishopping.servlet.AvatarUploadServlet</servlet-class>
 		<multipart-config>

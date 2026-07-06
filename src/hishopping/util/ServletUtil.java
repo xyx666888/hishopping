@@ -26,6 +26,7 @@ import hishopping.entity.Product;
 import hishopping.entity.ProductMedia;
 import hishopping.entity.ProductReview;
 import hishopping.entity.ProductReviewMedia;
+import hishopping.entity.Report;
 import hishopping.entity.ReviewReply;
 import hishopping.entity.Shipment;
 import hishopping.entity.User;
@@ -349,6 +350,43 @@ public class ServletUtil {
     public static List<Map<String, Object>> merchants(List<Merchant> merchants) {
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
         for (Merchant m : merchants) list.add(merchant(m));
+        return list;
+    }
+
+    public static Map<String, Object> report(Report r) {
+        Map<String, Object> map = new LinkedHashMap<String, Object>();
+        if (r == null) return map;
+        map.put("reportId", r.getReportId());
+        map.put("reporterRole", r.getReporterRole());
+        map.put("reporterId", r.getReporterId());
+        map.put("reporterName", r.getReporterName());
+        map.put("targetRole", r.getTargetRole());
+        map.put("targetId", r.getTargetId());
+        map.put("targetName", r.getTargetName());
+        map.put("merchantId", r.getMerchantId());
+        map.put("userId", r.getUserId());
+        map.put("orderId", r.getOrderId());
+        map.put("productId", r.getProductId());
+        map.put("reviewId", r.getReviewId());
+        map.put("reportType", r.getReportType());
+        map.put("reason", r.getReason());
+        map.put("description", r.getDescription());
+        map.put("evidenceUrls", r.getEvidenceUrls());
+        map.put("status", r.getStatus());
+        map.put("adminId", r.getAdminId());
+        map.put("adminName", r.getAdminName());
+        map.put("handleOpinion", r.getHandleOpinion());
+        map.put("handleResult", r.getHandleResult());
+        map.put("createTime", r.getCreateTime());
+        map.put("updateTime", r.getUpdateTime());
+        map.put("handleTime", r.getHandleTime());
+        return map;
+    }
+
+    public static List<Map<String, Object>> reports(List<Report> reports) {
+        List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+        if (reports == null) return list;
+        for (Report r : reports) list.add(report(r));
         return list;
     }
 
