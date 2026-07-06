@@ -36,6 +36,16 @@ public class ReportService {
         return dao.findForAdmin(status, keyword);
     }
 
+    public List<Report> adminReports(String status, String keyword, int page, int pageSize) {
+        if (!empty(status) && !"all".equalsIgnoreCase(status) && !validStatus(status)) throw new RuntimeException("举报状态不正确。");
+        return dao.findForAdmin(status, keyword, page, pageSize);
+    }
+
+    public int adminReportTotal(String status, String keyword) {
+        if (!empty(status) && !"all".equalsIgnoreCase(status) && !validStatus(status)) throw new RuntimeException("举报状态不正确。");
+        return dao.countForAdmin(status, keyword);
+    }
+
     public Report detail(int reportId) {
         if (reportId <= 0) throw new RuntimeException("举报编号不正确。");
         Report report = dao.findById(reportId);
@@ -58,7 +68,8 @@ public class ReportService {
             String title = "举报处理结果";
             String content = "举报 #" + report.getReportId() + " 已更新为 " + statusText(report.getStatus()) + "。处理意见：" + nullToEmpty(report.getHandleOpinion());
             messageDao.send("SYSTEM", 0, "系统通知", report.getReporterRole(), report.getReporterId(), report.getReporterName(), title, content, "REPORT", String.valueOf(report.getReportId()));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException e) {
+            System.err.println("[ReportService] 通知举报人失败，reportId=" + report.getReportId() + ", reporter=" + report.getReporterRole() + "#" + report.getReporterId() + ", error=" + e.getMessage());
         }
     }
 

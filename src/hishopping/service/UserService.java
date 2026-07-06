@@ -10,6 +10,7 @@ import hishopping.entity.User;
 
 public class UserService {
     private static final int MAX_ACCOUNT_ID_RETRY = 30;
+    private static final String DELETED_STATUS = "\u5df2\u5220\u9664";
     private static final Pattern MAINLAND_PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
@@ -103,6 +104,34 @@ public class UserService {
         user.setVipLevel(UserDao.calculateVipLevel(Math.max(0, growthValue)));
         user.setStatus(empty(status) ? "\u6b63\u5e38" : status.trim());
         userDao.updateUser(user, newPassword);
+    }
+
+    public void deleteUser(int id) {
+        if (id <= 0) {
+            throw new RuntimeException("\u7528\u6237\u7f16\u53f7\u4e0d\u6b63\u786e\u3002");
+        }
+        User user = userDao.findById(id);
+        if (user == null || DELETED_STATUS.equals(user.getStatus())) {
+            throw new RuntimeException("\u7528\u6237\u4e0d\u5b58\u5728\u3002");
+        }
+        if (!"user".equalsIgnoreCase(user.getRole())) {
+            throw new RuntimeException("\u4e0d\u5141\u8bb8\u5220\u9664\u7ba1\u7406\u5458\u6216\u975e\u666e\u901a\u7528\u6237\u8d26\u53f7\u3002");
+        }
+        userDao.markDeleted(id);
+    }
+
+    public void restoreUser(int id) {
+        if (id <= 0) {
+            throw new RuntimeException("\u7528\u6237\u7f16\u53f7\u4e0d\u6b63\u786e\u3002");
+        }
+        User user = userDao.findById(id);
+        if (user == null || DELETED_STATUS.equals(user.getStatus())) {
+            throw new RuntimeException("\u7528\u6237\u4e0d\u5b58\u5728\u3002");
+        }
+        if (!"user".equalsIgnoreCase(user.getRole())) {
+            throw new RuntimeException("\u4e0d\u5141\u8bb8\u64cd\u4f5c\u7ba1\u7406\u5458\u6216\u975e\u666e\u901a\u7528\u6237\u8d26\u53f7\u3002");
+        }
+        userDao.updateStatus(id, "\u6b63\u5e38");
     }
 
     private String generateUniqueAccountId() {

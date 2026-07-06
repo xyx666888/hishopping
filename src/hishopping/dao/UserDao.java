@@ -14,6 +14,7 @@ import hishopping.util.DBUtil;
 
 public class UserDao {
     private static final String NORMAL_STATUS = "\u6b63\u5e38";
+    private static final String DELETED_STATUS = "\u5df2\u5220\u9664";
     private static final String USER_COLUMNS = "id, account_id, username, email, phone, password, role, points, vip_level, growth_value, status, avatar_url, create_time";
     private static boolean accountIdChecked = false;
 
@@ -204,15 +205,16 @@ public class UserDao {
 
     public List<User> findAllUsers() {
         ensureAccountIdReady();
-        String sql = "select " + USER_COLUMNS + " from hishopping_user order by id";
+        String sql = "select " + USER_COLUMNS + " from hishopping_user where isnull(status,N'')<>? order by id";
         List<User> list = new ArrayList<User>();
         Connection conn = null;
-        Statement st = null;
+        PreparedStatement ps = null;
         ResultSet rs = null;
         try {
             conn = DBUtil.getConn();
-            st = conn.createStatement();
-            rs = st.executeQuery(sql);
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, DELETED_STATUS);
+            rs = ps.executeQuery();
             while (rs.next()) {
                 list.add(mapUser(rs));
             }
@@ -220,7 +222,7 @@ public class UserDao {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } finally {
-            DBUtil.closeDBResource(rs, st, conn);
+            DBUtil.closeDBResource(rs, ps, conn);
         }
     }
 
@@ -255,6 +257,46 @@ public class UserDao {
                 ps.setInt(8, user.getId());
             }
             ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void markDeleted(int userId) {
+        ensureAccountIdReady();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement("update hishopping_user set status=? where id=? and role=N'user'");
+            ps.setString(1, DELETED_STATUS);
+            ps.setInt(2, userId);
+            int rows = ps.executeUpdate();
+            if (rows == 0) {
+                throw new RuntimeException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u4e0d\u5141\u8bb8\u5220\u9664\u3002");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void updateStatus(int userId, String status) {
+        ensureAccountIdReady();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement("update hishopping_user set status=? where id=? and role=N'user'");
+            ps.setString(1, status);
+            ps.setInt(2, userId);
+            int rows = ps.executeUpdate();
+            if (rows == 0) {
+                throw new RuntimeException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u4e0d\u5141\u8bb8\u64cd\u4f5c\u3002");
+            }
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } finally {

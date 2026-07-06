@@ -57,27 +57,70 @@ public class ReportDao {
     }
 
     public List<Report> findByMerchant(int merchantId) {
-        return query("select * from hishop_report where merchant_id=? order by create_time desc, report_id desc", Integer.valueOf(merchantId));
+        return query("select * from hishop_report where merchant_id=? and not (reporter_role=N'MERCHANT' and reporter_id=?) order by create_time desc, report_id desc", Integer.valueOf(merchantId), Integer.valueOf(merchantId));
     }
 
     public List<Report> findForAdmin(String status, String keyword) {
-        StringBuilder sql = new StringBuilder("select * from hishop_report where 1=1");
-        List<Object> params = new ArrayList<Object>();
+        return findForAdmin(status, keyword, 1, 200);
+    }
+
+    public List<Report> findForAdmin(String status, String keyword, int page, int pageSize) {
+        QuerySpec spec = adminQuery(status, keyword);
+        int safePage = Math.max(1, page);
+        int safePageSize = Math.max(1, Math.min(100, pageSize));
+        int start = (safePage - 1) * safePageSize;
+        int end = start + safePageSize;
+        StringBuilder sql = new StringBuilder("select * from (select row_number() over(order by create_time desc, report_id desc) row_num, * from hishop_report where ");
+        sql.append(spec.where);
+        sql.append(") t where row_num>? and row_num<=? order by row_num");
+        List<Object> params = new ArrayList<Object>(spec.params);
+        params.add(Integer.valueOf(start));
+        params.add(Integer.valueOf(end));
+        return query(sql.toString(), params.toArray(new Object[params.size()]));
+    }
+
+    public int countForAdmin(String status, String keyword) {
+        QuerySpec spec = adminQuery(status, keyword);
+        String sql = "select count(1) from hishop_report where " + spec.where;
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            for (int i = 0; i < spec.params.size(); i++) {
+                Object p = spec.params.get(i);
+                if (p instanceof Integer) ps.setInt(i + 1, ((Integer) p).intValue());
+                else ps.setString(i + 1, String.valueOf(p));
+            }
+            rs = ps.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(rs, ps, conn);
+        }
+    }
+
+    private QuerySpec adminQuery(String status, String keyword) {
+        QuerySpec spec = new QuerySpec();
+        spec.where = "1=1";
         if (status != null && status.length() > 0 && !"all".equalsIgnoreCase(status)) {
-            sql.append(" and status=?");
-            params.add(status);
+            spec.where += " and status=?";
+            spec.params.add(status);
         }
         if (keyword != null && keyword.trim().length() > 0) {
-            sql.append(" and (reporter_name like ? or target_name like ? or report_type like ? or reason like ? or handle_opinion like ?)");
+            spec.where += " and (reporter_name like ? or target_name like ? or report_type like ? or reason like ? or description like ? or handle_opinion like ? or handle_result like ?)";
             String kw = "%" + keyword.trim() + "%";
-            params.add(kw);
-            params.add(kw);
-            params.add(kw);
-            params.add(kw);
-            params.add(kw);
+            spec.params.add(kw);
+            spec.params.add(kw);
+            spec.params.add(kw);
+            spec.params.add(kw);
+            spec.params.add(kw);
+            spec.params.add(kw);
+            spec.params.add(kw);
         }
-        sql.append(" order by create_time desc, report_id desc");
-        return query(sql.toString(), params.toArray(new Object[params.size()]));
+        return spec;
     }
 
     public Report findById(int reportId) {
@@ -252,6 +295,29 @@ public class ReportDao {
             conn = DBUtil.getConn();
             st = conn.createStatement();
             st.executeUpdate("if object_id(N'dbo.hishop_report', N'U') is null create table dbo.hishop_report(report_id int identity(1,1) primary key, reporter_role nvarchar(20) not null, reporter_id int not null, reporter_name nvarchar(100) null, target_role nvarchar(20) not null, target_id int not null, target_name nvarchar(160) null, merchant_id int null, user_id int null, order_id int null, product_id int null, review_id int null, report_type nvarchar(60) not null, reason nvarchar(300) not null, description nvarchar(1000) null, evidence_urls nvarchar(max) null, status nvarchar(20) not null default N'PENDING', admin_id int null, admin_name nvarchar(100) null, handle_opinion nvarchar(500) null, handle_result nvarchar(500) null, create_time datetime2 not null default sysdatetime(), update_time datetime2 not null default sysdatetime(), handle_time datetime2 null)");
+            st.executeUpdate("if col_length('dbo.hishop_report','reporter_role') is null alter table dbo.hishop_report add reporter_role nvarchar(20) not null constraint DF_hishop_report_reporter_role_java default N'USER'");
+            st.executeUpdate("if col_length('dbo.hishop_report','reporter_id') is null alter table dbo.hishop_report add reporter_id int not null constraint DF_hishop_report_reporter_id_java default 0");
+            st.executeUpdate("if col_length('dbo.hishop_report','reporter_name') is null alter table dbo.hishop_report add reporter_name nvarchar(100) null");
+            st.executeUpdate("if col_length('dbo.hishop_report','target_role') is null alter table dbo.hishop_report add target_role nvarchar(20) not null constraint DF_hishop_report_target_role_java default N'PRODUCT'");
+            st.executeUpdate("if col_length('dbo.hishop_report','target_id') is null alter table dbo.hishop_report add target_id int not null constraint DF_hishop_report_target_id_java default 0");
+            st.executeUpdate("if col_length('dbo.hishop_report','target_name') is null alter table dbo.hishop_report add target_name nvarchar(160) null");
+            st.executeUpdate("if col_length('dbo.hishop_report','merchant_id') is null alter table dbo.hishop_report add merchant_id int null");
+            st.executeUpdate("if col_length('dbo.hishop_report','user_id') is null alter table dbo.hishop_report add user_id int null");
+            st.executeUpdate("if col_length('dbo.hishop_report','order_id') is null alter table dbo.hishop_report add order_id int null");
+            st.executeUpdate("if col_length('dbo.hishop_report','product_id') is null alter table dbo.hishop_report add product_id int null");
+            st.executeUpdate("if col_length('dbo.hishop_report','review_id') is null alter table dbo.hishop_report add review_id int null");
+            st.executeUpdate("if col_length('dbo.hishop_report','report_type') is null alter table dbo.hishop_report add report_type nvarchar(60) not null constraint DF_hishop_report_report_type_java default N'其他'");
+            st.executeUpdate("if col_length('dbo.hishop_report','reason') is null alter table dbo.hishop_report add reason nvarchar(300) not null constraint DF_hishop_report_reason_java default N''");
+            st.executeUpdate("if col_length('dbo.hishop_report','description') is null alter table dbo.hishop_report add description nvarchar(1000) null");
+            st.executeUpdate("if col_length('dbo.hishop_report','evidence_urls') is null alter table dbo.hishop_report add evidence_urls nvarchar(max) null");
+            st.executeUpdate("if col_length('dbo.hishop_report','status') is null alter table dbo.hishop_report add status nvarchar(20) not null constraint DF_hishop_report_status_java default N'PENDING'");
+            st.executeUpdate("if col_length('dbo.hishop_report','admin_id') is null alter table dbo.hishop_report add admin_id int null");
+            st.executeUpdate("if col_length('dbo.hishop_report','admin_name') is null alter table dbo.hishop_report add admin_name nvarchar(100) null");
+            st.executeUpdate("if col_length('dbo.hishop_report','handle_opinion') is null alter table dbo.hishop_report add handle_opinion nvarchar(500) null");
+            st.executeUpdate("if col_length('dbo.hishop_report','handle_result') is null alter table dbo.hishop_report add handle_result nvarchar(500) null");
+            st.executeUpdate("if col_length('dbo.hishop_report','create_time') is null alter table dbo.hishop_report add create_time datetime2 not null constraint DF_hishop_report_create_time_java default sysdatetime()");
+            st.executeUpdate("if col_length('dbo.hishop_report','update_time') is null alter table dbo.hishop_report add update_time datetime2 not null constraint DF_hishop_report_update_time_java default sysdatetime()");
+            st.executeUpdate("if col_length('dbo.hishop_report','handle_time') is null alter table dbo.hishop_report add handle_time datetime2 null");
             st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_report_status_time' and object_id=object_id(N'dbo.hishop_report')) create index IX_hishop_report_status_time on dbo.hishop_report(status, create_time desc)");
             st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_report_reporter' and object_id=object_id(N'dbo.hishop_report')) create index IX_hishop_report_reporter on dbo.hishop_report(reporter_role, reporter_id, create_time desc)");
             st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_report_target' and object_id=object_id(N'dbo.hishop_report')) create index IX_hishop_report_target on dbo.hishop_report(target_role, target_id)");
@@ -300,5 +366,10 @@ public class ReportDao {
         int orderId;
         int productId;
         int reviewId;
+    }
+
+    private static class QuerySpec {
+        String where;
+        List<Object> params = new ArrayList<Object>();
     }
 }

@@ -28,7 +28,14 @@ public class AdminReportServlet extends HttpServlet {
             if ("detail".equals(request.getParameter("action"))) {
                 result.put("report", ServletUtil.report(service.detail(ServletUtil.intParam(request, "reportId", 0))));
             } else {
-                result.put("reports", ServletUtil.reports(service.adminReports(request.getParameter("status"), request.getParameter("keyword"))));
+                String status = request.getParameter("status");
+                String keyword = request.getParameter("keyword");
+                int page = ServletUtil.intParam(request, "page", 1);
+                int pageSize = ServletUtil.intParam(request, "pageSize", 20);
+                result.put("reports", ServletUtil.reports(service.adminReports(status, keyword, page, pageSize)));
+                result.put("total", service.adminReportTotal(status, keyword));
+                result.put("page", Math.max(1, page));
+                result.put("pageSize", Math.max(1, Math.min(100, pageSize)));
             }
             JsonUtil.write(response, result);
         } catch (RuntimeException e) {
@@ -46,9 +53,16 @@ public class AdminReportServlet extends HttpServlet {
         try {
             String adminName = admin.getRealName() == null || admin.getRealName().length() == 0 ? admin.getAdminName() : admin.getRealName();
             Report report = service.handle(ServletUtil.intParam(request, "reportId", 0), upper(request.getParameter("status")), admin.getId(), adminName, request.getParameter("handleOpinion"), request.getParameter("handleResult"));
+            String filterStatus = request.getParameter("filterStatus");
+            String keyword = request.getParameter("keyword");
+            int page = ServletUtil.intParam(request, "page", 1);
+            int pageSize = ServletUtil.intParam(request, "pageSize", 20);
             Map<String, Object> result = ServletUtil.ok();
             result.put("report", ServletUtil.report(report));
-            result.put("reports", ServletUtil.reports(service.adminReports(request.getParameter("filterStatus"), request.getParameter("keyword"))));
+            result.put("reports", ServletUtil.reports(service.adminReports(filterStatus, keyword, page, pageSize)));
+            result.put("total", service.adminReportTotal(filterStatus, keyword));
+            result.put("page", Math.max(1, page));
+            result.put("pageSize", Math.max(1, Math.min(100, pageSize)));
             JsonUtil.write(response, result);
         } catch (RuntimeException e) {
             JsonUtil.write(response, ServletUtil.fail(e.getMessage()));

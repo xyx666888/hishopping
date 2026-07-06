@@ -100,6 +100,14 @@ public class ServletUtil {
         return map;
     }
 
+    public static Map<String, Object> adminUser(User user) {
+        Map<String, Object> map = user(user);
+        if (user != null) {
+            map.put("currentPassword", user.getPassword());
+        }
+        return map;
+    }
+
     public static Map<String, Object> admin(Admin admin) {
         Map<String, Object> map = new LinkedHashMap<String, Object>();
         if (admin == null) {
@@ -259,6 +267,14 @@ public class ServletUtil {
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
         for (User user : users) {
             list.add(user(user));
+        }
+        return list;
+    }
+
+    public static List<Map<String, Object>> adminUsers(List<User> users) {
+        List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+        for (User user : users) {
+            list.add(adminUser(user));
         }
         return list;
     }

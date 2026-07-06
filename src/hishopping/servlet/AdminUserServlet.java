@@ -67,6 +67,14 @@ public class AdminUserServlet extends HttpServlet {
                 return;
             } else if ("voidCoupon".equals(action)) {
                 couponService.voidUserCoupon(ServletUtil.intParam(request, "userCouponId", 0), ServletUtil.intParam(request, "userId", 0));
+            } else if ("deleteUser".equals(action)) {
+                int userId = ServletUtil.intParam(request, "userId", 0);
+                userService.deleteUser(userId);
+                businessService.logAdmin(ServletUtil.currentAdmin(request).getId(), "DELETE_USER", "USER", userId, "\u5220\u9664\u7528\u6237\u8d26\u53f7");
+            } else if ("restoreUser".equals(action)) {
+                int userId = ServletUtil.intParam(request, "userId", 0);
+                userService.restoreUser(userId);
+                businessService.logAdmin(ServletUtil.currentAdmin(request).getId(), "RESTORE_USER", "USER", userId, "\u6062\u590d\u7528\u6237\u8d26\u53f7");
             } else {
                 userService.updateUser(
                     ServletUtil.intParam(request, "userId", 0),
@@ -90,7 +98,7 @@ public class AdminUserServlet extends HttpServlet {
     private Map<String, Object> adminUserCenter() {
         Map<String, Object> result = new LinkedHashMap<String, Object>();
         result.put("success", true);
-        result.put("users", ServletUtil.users(userService.users()));
+        result.put("users", ServletUtil.adminUsers(userService.users()));
         result.put("orders", ServletUtil.orders(orderService.all()));
         result.put("addresses", ServletUtil.addresses(addressService.all()));
         result.put("userCoupons", ServletUtil.userCoupons(couponService.allUserCoupons()));

@@ -82,6 +82,7 @@ var state = {
 	adminUserSort: "createDesc",
 	adminUserDetailTab: "basic",
 	adminUserOrderStatusFilter: "all",
+	adminUserPasswordVisible: {},
 	adminOrderStatusFilter: "all",
 	adminOrderKeyword: "",
 	adminSelectedMerchantId: null,
@@ -91,6 +92,10 @@ var state = {
 	adminReports: [],
 	adminReportStatusFilter: "all",
 	adminReportKeyword: "",
+	adminReportPage: 1,
+	adminReportPageSize: 20,
+	adminReportTotal: 0,
+	adminReportModal: null,
 	reportModal: null,
 	addresses: [],
 	selectedAddressId: null,
@@ -1191,8 +1196,9 @@ function applyAdminUserData(data) {
 	state.adminUserCoupons = data.userCoupons || [];
 	state.couponTemplates = data.couponTemplates || state.couponTemplates || [];
 	state.adminLogs = data.adminLogs || state.adminLogs || [];
-	if (state.adminUsers.length && !selectedAdminUser()) {
-		state.adminSelectedUserId = state.adminUsers[0].id;
+	var selectedExists = state.adminUsers.some(function(user) { return String(user.id) === String(state.adminSelectedUserId); });
+	if (!selectedExists) {
+		state.adminSelectedUserId = state.adminUsers.length ? state.adminUsers[0].id : null;
 	}
 }
 
@@ -1369,28 +1375,6 @@ function reviewableOrderOptions(productId) {
 		});
 	});
 	return options.join("");
-}
-
-function renderProductReviews(product) {
-	var reviews = state.productReviews || [];
-	var rows = reviews.map(function(review) {
-		var replies = (review.replies || []).map(function(reply) {
-			return '<div class="review-reply"><b>' + escapeHtml(reply.userName || roleName(reply.userType)) + '</b><span>' + escapeHtml(reply.content || "") + '</span><time>' + escapeHtml(shortDate(reply.createTime || "")) + '</time></div>';
-		}).join("");
-		return '<article class="review-item">' +
-			avatarMarkup(review.userAvatar, String(review.username || "用").charAt(0), "review-avatar") +
-			'<div><div class="review-head"><strong>' + escapeHtml(review.username || ("用户 " + review.userId)) + '</strong><span class="rating">★ ' + Number(review.rating || 0).toFixed(1) + '</span><time>' + escapeHtml(shortDate(review.createTime || "")) + '</time></div>' +
-			'<p>' + escapeHtml(review.content || "这位用户没有填写文字评价。") + '</p><div class="review-actions"><button class="ghost-btn review-like ' + (review.liked ? "active" : "") + '" data-id="' + review.id + '" type="button">点赞 ' + Number(review.likeCount || 0) + '</button><button class="ghost-btn review-reply-open" data-id="' + review.id + '" type="button">回复</button></div>' +
-			(replies ? '<div class="review-replies">' + replies + '</div>' : '') + '</div></article>';
-	}).join("") || '<div class="empty-cart compact-empty"><h3>暂无评价</h3><p class="muted">完成订单后可以发表真实评分，评分会参与首页排序。</p></div>';
-	var options = state.user ? reviewableOrderOptions(product.id) : "";
-	var form = "";
-	if (state.user) {
-		form = options ? '<form class="review-form" id="detailReviewForm"><label class="field"><span>评价订单</span><select id="detailReviewOrder">' + options + '</select></label><label class="field"><span>评分</span><select id="detailReviewRating"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label><label class="field wide"><span>评价内容</span><textarea id="detailReviewContent" rows="3" placeholder="分享真实体验，帮助其他用户选择"></textarea></label><button class="primary-btn" type="submit">提交评价</button></form>' : '<p class="muted review-hint">购买并完成该商品订单后，可以在这里或订单页发表评价。</p>';
-	} else {
-		form = '<p class="muted review-hint">登录普通用户后可点赞、回复或发表评价。</p>';
-	}
-	return '<section class="panel-card product-review-panel"><div class="section-head"><div><h2>评论评分</h2><p>商品评分、评论数和点赞数会参与推荐、热门、精选和发现排序。</p></div><div class="review-summary"><b>★ ' + Number(product.rating || 0).toFixed(1) + '</b><span>' + Number(product.reviewCount || reviews.length || 0) + ' 条评价</span></div></div>' + form + '<div class="review-list">' + rows + '</div></section>';
 }
 
 function renderProductReviews(product) {
@@ -2162,63 +2146,10 @@ function skuRowsForProduct(product) {
 	}];
 }
 
-function buildSkuRows(colors, specs, product, currentRows) {
-	var map = {};
-	currentRows.forEach(function(row) {
-		map[String(row.color || "默认") + "||" + String(row.spec || "标准")] = row;
-	});
-	var rows = [];
-	colors.forEach(function(color) {
-		specs.forEach(function(spec) {
-			var old = map[color + "||" + spec] || {};
-			rows.push({
-				skuId: old.skuId || (color + "-" + spec).replace(/\s+/g, "-"),
-				color: color,
-				spec: spec,
-				price: Number(old.price || product.price || 0),
-				oldPrice: Number(old.oldPrice || product.oldPrice || product.price || 0),
-				stock: Number(old.stock || product.stock || 0),
-				enabled: old.enabled !== false
-			});
-		});
-	});
-	return rows;
-}
-
-function skuRowsHtml(rows) {
-	return rows.map(function(row, index) {
-		return '<tr class="sku-row"><td><input class="sku-color" value="' + escapeHtml(row.color || "默认") + '"></td><td><input class="sku-spec" value="' + escapeHtml(row.spec || "标准") + '"></td><td><input class="sku-price" type="number" step="0.01" value="' + escapeHtml(row.price || 0) + '"></td><td><input class="sku-old-price" type="number" step="0.01" value="' + escapeHtml(row.oldPrice || row.price || 0) + '"></td><td><input class="sku-stock" type="number" value="' + escapeHtml(row.stock || 0) + '"></td><td><label class="check-field sku-enabled"><input class="sku-enable" type="checkbox" ' + (row.enabled === false ? "" : "checked") + '> 启用</label><input class="sku-id" type="hidden" value="' + escapeHtml(row.skuId || ("SKU-" + index)) + '"></td></tr>';
-	}).join("");
-}
-
-function renderSkuEditor(product) {
-	product = product || {};
-	var rows = skuRowsForProduct(product);
-	var colors = optionListText(product.colorOptions || rows.map(function(row) { return row.color; }), "默认");
-	var specs = optionListText(product.specOptions || rows.map(function(row) { return row.spec; }), "标准");
-	return '<div class="field wide sku-editor"><div class="sku-editor-head"><span>规格配置</span><button class="ghost-btn" id="generateSkuRows" type="button">生成组合</button></div><div class="sku-option-grid"><label class="field"><span>颜色/口味</span><input id="mpColors" value="' + escapeHtml(colors) + '" placeholder="原味，加钙，全脂"></label><label class="field"><span>规格</span><input id="mpSpecs" value="' + escapeHtml(specs) + '" placeholder="单罐装，双罐装，家庭装"></label></div><div class="admin-table sku-editor-table"><table><thead><tr><th>颜色</th><th>规格</th><th>价格</th><th>原价</th><th>库存</th><th>状态</th></tr></thead><tbody id="skuRowsBody">' + skuRowsHtml(rows) + '</tbody></table></div><p class="muted">规格价格和库存会用于商品详情、购物车和下单校验；旧商品可只保留默认组合。</p></div>';
-}
-
 function readListInput(id, fallback) {
 	var value = document.getElementById(id) ? document.getElementById(id).value : "";
 	var list = String(value || "").split(/[,，、\n]/).map(function(item) { return item.trim(); }).filter(function(item) { return item; });
 	return list.length ? list : [fallback];
-}
-
-function readSkuRows() {
-	return Array.prototype.map.call(document.querySelectorAll("#skuRowsBody .sku-row"), function(row, index) {
-		var color = row.querySelector(".sku-color").value.trim() || "默认";
-		var spec = row.querySelector(".sku-spec").value.trim() || "标准";
-		return {
-			skuId: row.querySelector(".sku-id").value || (color + "-" + spec + "-" + index),
-			color: color,
-			spec: spec,
-			price: Number(row.querySelector(".sku-price").value || 0),
-			oldPrice: Number(row.querySelector(".sku-old-price").value || row.querySelector(".sku-price").value || 0),
-			stock: Number(row.querySelector(".sku-stock").value || 0),
-			enabled: row.querySelector(".sku-enable").checked
-		};
-	});
 }
 
 function skuSummaryHtml(product) {
@@ -2401,12 +2332,22 @@ function loadMerchantReports() {
 function loadAdminReports() {
 	if (!state.admin) {
 		state.adminReports = [];
+		state.adminReportTotal = 0;
 		return Promise.resolve();
 	}
-	var query = "admin/reports?action=list&status=" + encodeURIComponent(state.adminReportStatusFilter || "all") + "&keyword=" + encodeURIComponent(state.adminReportKeyword || "");
+	var page = Math.max(1, Number(state.adminReportPage || 1));
+	var pageSize = Math.max(1, Math.min(100, Number(state.adminReportPageSize || 20)));
+	var query = "admin/reports?action=list&status=" + encodeURIComponent(state.adminReportStatusFilter || "all") + "&keyword=" + encodeURIComponent(state.adminReportKeyword || "") + "&page=" + page + "&pageSize=" + pageSize;
 	return get(query).then(function(data) {
-		if (data.success) state.adminReports = data.reports || [];
-		else state.adminReports = [];
+		if (data.success) {
+			state.adminReports = data.reports || [];
+			state.adminReportPage = Number(data.page || page);
+			state.adminReportPageSize = Number(data.pageSize || pageSize);
+			state.adminReportTotal = Number(data.total || state.adminReports.length || 0);
+		} else {
+			state.adminReports = [];
+			state.adminReportTotal = 0;
+		}
 	});
 }
 
@@ -2760,7 +2701,7 @@ function renderAdminUserList() {
 		var coupons = adminUserCoupons(user.id);
 		var vip = currentVip(user);
 		var active = String(state.adminSelectedUserId) === String(user.id) ? " active" : "";
-		return '<tr class="admin-user-row' + active + '" data-id="' + user.id + '"><td><b>' + escapeHtml(user.accountId || user.id) + '</b></td><td>' + escapeHtml(user.username) + '</td><td>' + escapeHtml(user.phone || "") + '</td><td>' + escapeHtml(user.email || "") + '</td><td>' + badge(user.status || "正常", user.status === "停用" ? "red" : "green") + '</td><td><span class="admin-vip"><img src="' + vipBadgeSrc(vip.level) + '" alt="VIP' + vip.level + '"><b>VIP' + vip.level + '</b><small>' + escapeHtml(vip.name) + '</small></span></td><td>' + growthValue(user) + '</td><td>' + Number(user.points || 0) + '</td><td>' + orders.length + '</td><td><b>' + money(adminUserSpend(user.id)) + '</b></td><td>' + coupons.length + '</td><td>' + escapeHtml((user.createTime || "").slice(0, 19)) + '</td><td><button class="primary-btn admin-user-select" data-id="' + user.id + '" type="button">管理</button></td></tr>';
+		return '<tr class="admin-user-row' + active + '" data-id="' + user.id + '"><td><b>' + escapeHtml(user.accountId || user.id) + '</b></td><td>' + escapeHtml(user.username) + '</td><td>' + escapeHtml(user.phone || "") + '</td><td>' + escapeHtml(user.email || "") + '</td><td>' + badge(user.status || "正常", user.status === "停用" ? "red" : "green") + '</td><td><span class="admin-vip"><img src="' + vipBadgeSrc(vip.level) + '" alt="VIP' + vip.level + '"><b>VIP' + vip.level + '</b><small>' + escapeHtml(vip.name) + '</small></span></td><td>' + growthValue(user) + '</td><td>' + Number(user.points || 0) + '</td><td>' + orders.length + '</td><td><b>' + money(adminUserSpend(user.id)) + '</b></td><td>' + coupons.length + '</td><td>' + escapeHtml((user.createTime || "").slice(0, 19)) + '</td><td><button class="danger-btn admin-user-delete" data-id="' + user.id + '" type="button">删除</button></td></tr>';
 	}).join("") || '<tr><td colspan="13">暂无匹配用户。</td></tr>';
 	return '<div class="admin-table tall admin-user-table"><table><thead><tr><th>用户ID</th><th>用户名</th><th>手机号</th><th>邮箱</th><th>状态</th><th>VIP等级</th><th>成长值</th><th>积分</th><th>订单数</th><th>消费总额</th><th>优惠券</th><th>注册时间</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
@@ -2778,7 +2719,9 @@ function renderAdminUserTabs() {
 }
 
 function renderAdminUserBasic(user) {
-	return '<div class="admin-user-form"><label class="field"><span>用户名</span><input class="admin-input" id="adminUserName" value="' + escapeHtml(user.username) + '"></label><label class="field"><span>手机号</span><input class="admin-input" id="adminUserPhone" value="' + escapeHtml(user.phone || "") + '"></label><label class="field"><span>邮箱</span><input class="admin-input" id="adminUserEmail" value="' + escapeHtml(user.email || "") + '"></label><label class="field"><span>新密码</span><input class="admin-input" id="adminUserPassword" type="password" placeholder="留空则不修改"></label><label class="field"><span>状态</span><select class="admin-input" id="adminUserStatus"><option ' + (user.status === "正常" ? "selected" : "") + '>正常</option><option ' + (user.status === "停用" ? "selected" : "") + '>停用</option></select></label><div class="profile-metrics"><div><b>' + adminUserOrders(user.id).length + '</b><span>订单</span></div><div><b>' + money(adminUserSpend(user.id)) + '</b><span>消费</span></div><div><b>' + adminUserCoupons(user.id).length + '</b><span>优惠券</span></div></div><button class="primary-btn admin-user-save" data-id="' + user.id + '" type="button">保存基础信息</button></div>';
+	var visible = !!state.adminUserPasswordVisible[user.id];
+	var passwordText = visible ? (user.currentPassword || "") : "&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;";
+	return '<div class="admin-user-form"><label class="field"><span>用户名</span><input class="admin-input" id="adminUserName" value="' + escapeHtml(user.username) + '"></label><label class="field"><span>手机号</span><input class="admin-input" id="adminUserPhone" value="' + escapeHtml(user.phone || "") + '"></label><label class="field"><span>邮箱</span><input class="admin-input" id="adminUserEmail" value="' + escapeHtml(user.email || "") + '"></label><label class="field"><span>当前密码</span><div class="admin-password-view"><code>' + (visible ? escapeHtml(passwordText) : passwordText) + '</code><button class="ghost-btn admin-user-password-toggle ' + (visible ? "visible" : "") + '" data-id="' + user.id + '" type="button" title="' + (visible ? "隐藏当前密码" : "显示当前密码") + '" aria-label="' + (visible ? "隐藏当前密码" : "显示当前密码") + '"><span class="eye-icon" aria-hidden="true"></span></button></div></label><label class="field"><span>新密码</span><input class="admin-input" id="adminUserPassword" type="password" placeholder="留空则不修改"></label><label class="field"><span>状态</span><select class="admin-input" id="adminUserStatus"><option ' + (user.status === "正常" ? "selected" : "") + '>正常</option><option ' + (user.status === "停用" ? "selected" : "") + '>停用</option></select></label><div class="profile-metrics"><div><b>' + adminUserOrders(user.id).length + '</b><span>订单</span></div><div><b>' + money(adminUserSpend(user.id)) + '</b><span>消费</span></div><div><b>' + adminUserCoupons(user.id).length + '</b><span>优惠券</span></div></div><button class="primary-btn admin-user-save" data-id="' + user.id + '" type="button">保存基础信息</button></div>';
 }
 
 function renderAdminUserOrderItems(order) {
@@ -2869,7 +2812,7 @@ function renderAdmin() {
 	].map(function(item) {
 		return '<div class="simple-card admin-stat-card"><div class="icon-tile">数</div><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>';
 	}).join("");
-	var userSection = '<section class="panel-card admin-section admin-user-center"><div class="section-head"><div><h2>用户管理</h2><p>先选择用户，再集中维护账号、订单、地址、会员积分和优惠券。</p></div></div>' + renderAdminUserFilters() + '<div class="admin-user-center-grid"><div>' + renderAdminUserList() + '</div>' + renderAdminUserDetail() + '</div></section>';
+	var userSection = '<section class="panel-card admin-section admin-user-center"><div class="section-head"><div><h2>用户管理</h2><p>先选择用户，再集中维护账号、订单、地址、会员积分和优惠券。</p></div></div>' + renderAdminUserFilters() + '<div class="admin-user-center-grid"><div class="admin-user-main-column">' + renderAdminUserList() + '</div><div class="admin-user-side">' + renderAdminUserDetail() + '</div></div></section>';
 	if (state.page === "adminUsers") return userSection;
 	if (state.page === "adminOrders") return renderAdminOrderManage();
 	return '<section class="admin-stats">' + stats + '</section>' + userSection;
@@ -2903,7 +2846,7 @@ function reportRows(reports, adminMode) {
 	return (reports || []).map(function(r) {
 		var reason = String(r.reason || "");
 		var summary = reason.length > 42 ? reason.slice(0, 42) + "..." : reason;
-		var actions = adminMode ? '<button class="ghost-btn admin-report-view" data-id="' + r.reportId + '" type="button">查看</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="PROCESSING" type="button">处理中</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="APPROVED" type="button">通过</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="REJECTED" type="button">驳回</button><button class="ghost-btn admin-report-handle" data-id="' + r.reportId + '" data-status="CLOSED" type="button">关闭</button>' : '<span class="muted">' + escapeHtml(r.handleOpinion || "等待平台处理") + '</span>';
+		var actions = adminMode ? '<button class="ghost-btn admin-report-view" data-id="' + r.reportId + '" type="button">查看/处理</button>' : '<span class="muted">' + escapeHtml(r.handleOpinion || "等待平台处理") + '</span>';
 		return '<tr><td>#' + r.reportId + '</td><td>' + reportRoleText(r.reporterRole) + '<p class="muted">' + escapeHtml(r.reporterName || "") + '</p></td><td>' + reportRoleText(r.targetRole) + '<p class="muted">' + escapeHtml(r.targetName || ("#" + r.targetId)) + '</p></td><td>' + escapeHtml(r.reportType || "") + '</td><td>' + escapeHtml(summary) + '</td><td>' + badge(reportStatusText(r.status), reportStatusTone(r.status)) + '</td><td>' + escapeHtml(shortDate(r.createTime || "")) + '</td><td class="report-actions">' + actions + '</td></tr>';
 	}).join("");
 }
@@ -2911,6 +2854,47 @@ function reportRows(reports, adminMode) {
 function renderReportTable(reports, adminMode, emptyText) {
 	var rows = reportRows(reports, adminMode) || '<tr><td colspan="8">' + escapeHtml(emptyText || "暂无举报记录。") + '</td></tr>';
 	return '<div class="admin-table report-table"><table><thead><tr><th>编号</th><th>举报人</th><th>对象</th><th>类型</th><th>原因摘要</th><th>状态</th><th>提交时间</th><th>操作/处理意见</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+function renderReportDetailRows(report) {
+	var items = [
+		["举报人", reportRoleText(report.reporterRole) + " #" + (report.reporterId || "") + " " + (report.reporterName || "")],
+		["举报对象", reportRoleText(report.targetRole) + " #" + (report.targetId || "") + " " + (report.targetName || "")],
+		["举报类型", report.reportType || ""],
+		["举报原因", report.reason || ""],
+		["详细说明", report.description || ""],
+		["证据链接", report.evidenceUrls || ""],
+		["提交时间", report.createTime || ""],
+		["当前状态", reportStatusText(report.status)],
+		["处理人", report.adminName || ""],
+		["处理意见", report.handleOpinion || ""],
+		["处理结果", report.handleResult || ""],
+		["处理时间", report.handleTime || ""]
+	];
+	return items.map(function(item) {
+		var value = item[0] === "证据链接" && item[1] ? String(item[1]).split(/[,，\s]+/).filter(function(url) { return url; }).map(function(url) {
+			return '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener">' + escapeHtml(url) + '</a>';
+		}).join("<br>") : escapeHtml(item[1] || "-");
+		return '<div class="report-detail-row"><span>' + item[0] + '</span><strong>' + value + '</strong></div>';
+	}).join("");
+}
+
+function renderAdminReportModal() {
+	var report = state.adminReportModal;
+	if (!report) return "";
+	var statuses = ["PROCESSING", "APPROVED", "REJECTED", "CLOSED"];
+	var options = statuses.map(function(status) {
+		return '<option value="' + status + '" ' + (report.status === status ? "selected" : "") + '>' + reportStatusText(status) + '</option>';
+	}).join("");
+	return '<div class="report-modal-backdrop"><form class="report-modal admin-report-modal" id="adminReportHandleForm"><div class="section-head"><div><h2>举报 #' + report.reportId + '</h2><p>' + escapeHtml(reportRoleText(report.targetRole) + " · " + (report.targetName || ("#" + report.targetId))) + '</p></div><button class="ghost-btn admin-report-modal-close" type="button">关闭</button></div><div class="report-detail-grid">' + renderReportDetailRows(report) + '</div><label class="field"><span>处理状态</span><select id="adminReportHandleStatus">' + options + '</select></label><label class="field wide"><span>处理意见</span><textarea id="adminReportHandleOpinion" rows="3" placeholder="写给举报人的处理意见">' + escapeHtml(report.handleOpinion || "") + '</textarea></label><label class="field wide"><span>处理结果</span><textarea id="adminReportHandleResult" rows="3" placeholder="记录平台最终处理结果">' + escapeHtml(report.handleResult || "") + '</textarea></label><div class="form-actions"><button class="ghost-btn admin-report-modal-close" type="button">取消</button><button class="primary-btn" type="submit">提交处理</button></div></form></div>';
+}
+
+function renderAdminReportPager() {
+	var page = Math.max(1, Number(state.adminReportPage || 1));
+	var pageSize = Math.max(1, Number(state.adminReportPageSize || 20));
+	var total = Math.max(0, Number(state.adminReportTotal || 0));
+	var totalPages = Math.max(1, Math.ceil(total / pageSize));
+	return '<div class="report-pager"><span>共 ' + total + ' 条，第 ' + page + ' / ' + totalPages + ' 页</span><div><button class="ghost-btn admin-report-page" data-page="' + (page - 1) + '" type="button" ' + (page <= 1 ? "disabled" : "") + '>上一页</button><button class="ghost-btn admin-report-page" data-page="' + (page + 1) + '" type="button" ' + (page >= totalPages ? "disabled" : "") + '>下一页</button></div></div>';
 }
 
 function renderReports() {
@@ -2930,7 +2914,7 @@ function renderAdminReports() {
 		var text = status === "all" ? "全部状态" : reportStatusText(status);
 		return '<option value="' + status + '" ' + (state.adminReportStatusFilter === status ? "selected" : "") + '>' + text + '</option>';
 	}).join("");
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>举报管理</h2><p>统一筛选、查看并处理用户和商家提交的举报。</p></div></div><div class="admin-user-toolbar"><label class="field"><span>状态</span><select id="adminReportStatusFilter">' + options + '</select></label><label class="field"><span>搜索</span><input id="adminReportKeyword" value="' + escapeHtml(state.adminReportKeyword || "") + '" placeholder="举报人、对象、类型、原因"></label></div>' + renderReportTable(state.adminReports, true, "暂无匹配举报。") + '</section>';
+	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>举报管理</h2><p>统一筛选、查看并处理用户和商家提交的举报。</p></div></div><div class="admin-user-toolbar"><label class="field"><span>状态</span><select id="adminReportStatusFilter">' + options + '</select></label><label class="field"><span>搜索</span><input id="adminReportKeyword" value="' + escapeHtml(state.adminReportKeyword || "") + '" placeholder="举报人、对象、类型、原因"></label></div>' + renderReportTable(state.adminReports, true, "暂无匹配举报。") + renderAdminReportPager() + '</section>';
 }
 
 function renderReportModal() {
@@ -3375,6 +3359,7 @@ function bindPageActions() {
 	if (adminReportStatusFilter) {
 		adminReportStatusFilter.onchange = function() {
 			state.adminReportStatusFilter = adminReportStatusFilter.value;
+			state.adminReportPage = 1;
 			loadAdminReports().then(renderPage);
 		};
 	}
@@ -3383,39 +3368,67 @@ function bindPageActions() {
 		var reportSearchTimer = null;
 		adminReportKeyword.oninput = function() {
 			state.adminReportKeyword = adminReportKeyword.value;
+			state.adminReportPage = 1;
 			clearTimeout(reportSearchTimer);
 			reportSearchTimer = setTimeout(function() { loadAdminReports().then(renderPage); }, 220);
 		};
 	}
-	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-view"), function(btn) {
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-page"), function(btn) {
 		btn.onclick = function() {
-			var report = (state.adminReports || []).filter(function(item) { return String(item.reportId) === String(btn.getAttribute("data-id")); })[0];
-			if (!report) return;
-			alert("举报 #" + report.reportId + "\n对象：" + reportRoleText(report.targetRole) + " " + (report.targetName || report.targetId) + "\n原因：" + (report.reason || "") + "\n说明：" + (report.description || "") + "\n处理意见：" + (report.handleOpinion || ""));
+			if (btn.disabled) return;
+			state.adminReportPage = Math.max(1, Number(btn.getAttribute("data-page") || 1));
+			loadAdminReports().then(renderPage);
 		};
 	});
-	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-handle"), function(btn) {
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-view"), function(btn) {
 		btn.onclick = function() {
-			var status = btn.getAttribute("data-status");
-			var opinion = prompt("请输入处理意见", reportStatusText(status));
-			if (opinion == null) return;
-			var result = prompt("请输入处理结果", reportStatusText(status)) || "";
-			post("admin/reports", {
-				action: "handle",
-				reportId: btn.getAttribute("data-id"),
-				status: status,
-				handleOpinion: opinion,
-				handleResult: result,
-				filterStatus: state.adminReportStatusFilter || "all",
-				keyword: state.adminReportKeyword || ""
-			}).then(function(data) {
-				if (!data.success) { alert(data.message || "处理失败"); return; }
-				state.adminReports = data.reports || [];
-				showToast("举报状态已更新");
+			get("admin/reports?action=detail&reportId=" + encodeURIComponent(btn.getAttribute("data-id"))).then(function(data) {
+				if (!data.success) { alert(data.message || "无法加载举报详情"); return; }
+				state.adminReportModal = data.report || null;
 				renderPage();
 			});
 		};
 	});
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-modal-close"), function(btn) {
+		btn.onclick = function() {
+			state.adminReportModal = null;
+			renderPage();
+		};
+	});
+	var adminReportHandleForm = document.getElementById("adminReportHandleForm");
+	if (adminReportHandleForm) {
+		adminReportHandleForm.onsubmit = function(e) {
+			e.preventDefault();
+			var report = state.adminReportModal || {};
+			var status = document.getElementById("adminReportHandleStatus").value;
+			var opinion = document.getElementById("adminReportHandleOpinion").value.trim();
+			var result = document.getElementById("adminReportHandleResult").value.trim();
+			if (!opinion) {
+				alert("请填写处理意见");
+				return;
+			}
+			post("admin/reports", {
+				action: "handle",
+				reportId: report.reportId,
+				status: status,
+				handleOpinion: opinion,
+				handleResult: result,
+				filterStatus: state.adminReportStatusFilter || "all",
+				keyword: state.adminReportKeyword || "",
+				page: state.adminReportPage || 1,
+				pageSize: state.adminReportPageSize || 20
+			}).then(function(data) {
+				if (!data.success) { alert(data.message || "处理失败"); return; }
+				state.adminReports = data.reports || [];
+				state.adminReportPage = Number(data.page || state.adminReportPage || 1);
+				state.adminReportPageSize = Number(data.pageSize || state.adminReportPageSize || 20);
+				state.adminReportTotal = Number(data.total || state.adminReports.length || 0);
+				state.adminReportModal = null;
+				showToast("举报状态已更新");
+				renderPage();
+			});
+		};
+	}
 	Array.prototype.forEach.call(document.querySelectorAll(".add-cart,.buy-now"), function(btn) {
 		btn.onclick = function() { addToCart(Number(btn.getAttribute("data-id")), btn.classList.contains("buy-now")); };
 	});
@@ -4395,6 +4408,26 @@ function bindPageActions() {
 			renderPage();
 		};
 	});
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-user-delete"), function(btn) {
+		btn.onclick = function(e) {
+			if (e) e.stopPropagation();
+			if (!confirm("确定删除该用户账号吗？删除后不可恢复。")) return;
+			post("admin/users", { action: "deleteUser", userId: btn.getAttribute("data-id") }).then(function(data) {
+				if (!data.success) { alert(data.message || "删除失败"); return; }
+				applyAdminUserData(data);
+				showToast("用户已删除");
+				renderPage();
+			});
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-user-password-toggle"), function(btn) {
+		btn.onclick = function(e) {
+			if (e) e.stopPropagation();
+			var id = btn.getAttribute("data-id");
+			state.adminUserPasswordVisible[id] = !state.adminUserPasswordVisible[id];
+			renderPage();
+		};
+	});
 	Array.prototype.forEach.call(document.querySelectorAll(".admin-user-tab"), function(btn) {
 		btn.onclick = function() {
 			state.adminUserDetailTab = btn.getAttribute("data-tab");
@@ -5104,7 +5137,7 @@ function renderPage() {
 	if (state.page === "adminCouponCenter") html = renderAdminCouponCenter();
 	if (state.page === "adminCouponManage") html = renderAdminCouponManage();
 	if (state.page === "adminCouponIssue") html = renderAdminCouponIssue();
-	root.innerHTML = html + renderReportModal();
+	root.innerHTML = html + renderReportModal() + renderAdminReportModal();
 	bindDelegatedPageActions();
 	bindPageActions();
 }
