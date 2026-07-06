@@ -106,7 +106,7 @@ WebContent/WEB-INF/web.xml   Web 应用配置
 
 ---
 
-感谢你看到这里！🌱
+感谢你看到这里，本项目仍在优化完善中……期待你的想法和建议！🌱
 
 ---
 
@@ -221,6 +221,6 @@ Contact: 3840632919@qq.com
 
 ---
 
-Thank you for reading this far! 🌱
+Thank you for reading this far, this project is still being optimized and improved... I look forward to your thoughts and suggestions! 🌱
 
 </details>
