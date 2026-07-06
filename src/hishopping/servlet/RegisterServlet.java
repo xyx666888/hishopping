@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 import hishopping.entity.User;
 import hishopping.service.BusinessService;
 import hishopping.service.UserService;
+import hishopping.util.CaptchaUtil;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -37,6 +38,11 @@ public class RegisterServlet extends HttpServlet {
             }
             if (isEmpty(request.getParameter("password"))) {
                 JsonUtil.write(response, ServletUtil.fail("请输入密码。"));
+                return;
+            }
+            CaptchaUtil.CaptchaResult captcha = CaptchaUtil.verify(request, request.getParameter("captcha"));
+            if (!captcha.isValid()) {
+                JsonUtil.write(response, ServletUtil.fail(captcha.getMessage()));
                 return;
             }
             User user = userService.register(request.getParameter("username"), request.getParameter("email"), request.getParameter("phone"), request.getParameter("password"));

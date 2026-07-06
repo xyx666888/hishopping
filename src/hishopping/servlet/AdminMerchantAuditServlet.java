@@ -75,6 +75,7 @@ public class AdminMerchantAuditServlet extends HttpServlet {
                 product.setSpecOptions(request.getParameter("specOptions"));
                 product.setSkuAttrs(request.getParameter("skuAttrs"));
                 product.setSkuOptions(request.getParameter("skuOptions"));
+                product.setProductAttrs(request.getParameter("productAttrs"));
                 productService.updateAdminMerchantProduct(product);
             } else if ("productAudit".equals(action)) {
                 productService.auditMerchantProduct(ServletUtil.intParam(request, "productId", 0), request.getParameter("auditAction"), request.getParameter("opinion"), admin.getId());

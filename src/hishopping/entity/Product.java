@@ -23,6 +23,7 @@ public class Product {
     private String specOptions;
     private String skuAttrs;
     private String skuOptions;
+    private String productAttrs;
     private String status;
     private int merchantId;
     private String merchantCode;
@@ -77,6 +78,8 @@ public class Product {
     public void setSkuAttrs(String skuAttrs) { this.skuAttrs = skuAttrs; }
     public String getSkuOptions() { return skuOptions; }
     public void setSkuOptions(String skuOptions) { this.skuOptions = skuOptions; }
+    public String getProductAttrs() { return productAttrs; }
+    public void setProductAttrs(String productAttrs) { this.productAttrs = productAttrs; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public int getMerchantId() { return merchantId; }

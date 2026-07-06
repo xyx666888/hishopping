@@ -25,6 +25,7 @@ import hishopping.entity.OrderItem;
 import hishopping.entity.Product;
 import hishopping.entity.ProductMedia;
 import hishopping.entity.ProductReview;
+import hishopping.entity.ProductReviewMedia;
 import hishopping.entity.ReviewReply;
 import hishopping.entity.Shipment;
 import hishopping.entity.User;
@@ -148,6 +149,8 @@ public class ServletUtil {
         map.put("specOptions", split(p.getSpecOptions()));
         map.put("skuAttrs", SkuUtil.attrMaps(p));
         map.put("skuOptions", SkuUtil.skuMaps(p));
+        map.put("productAttrs", ProductAttrUtil.attrMaps(p));
+        map.put("productAttrsJson", ProductAttrUtil.normalizeJson(p.getProductAttrs()));
         map.put("status", p.getStatus());
         map.put("merchantId", p.getMerchantId());
         map.put("merchantCode", p.getMerchantCode());
@@ -476,19 +479,49 @@ public class ServletUtil {
         if (reviews == null) return list;
         for (ProductReview r : reviews) {
             Map<String, Object> map = new LinkedHashMap<String, Object>();
+            boolean anonymous = r.isAnonymous();
             map.put("reviewId", r.getReviewId());
+            map.put("id", r.getReviewId());
             map.put("orderId", r.getOrderId());
+            map.put("orderItemId", r.getOrderItemId());
             map.put("productId", r.getProductId());
-            map.put("userId", r.getUserId());
-            map.put("username", r.getUsername());
-            map.put("userAvatar", r.getUserAvatar());
+            map.put("userId", anonymous ? 0 : r.getUserId());
+            map.put("anonymous", anonymous);
+            map.put("username", anonymous ? "匿名用户" : r.getUsername());
+            map.put("userAvatar", anonymous ? "" : r.getUserAvatar());
             map.put("rating", r.getRating());
             map.put("content", r.getContent());
             map.put("status", r.getStatus());
             map.put("likeCount", r.getLikeCount());
             map.put("replyCount", r.getReplyCount());
+            map.put("mediaCount", r.getMediaCount());
+            map.put("mediaList", productReviewMedia(r.getMediaList()));
+            map.put("skuText", r.getSkuText());
+            map.put("selectedColor", r.getSelectedColor());
+            map.put("selectedSpec", r.getSelectedSpec());
             map.put("liked", r.isLiked());
             map.put("createTime", r.getCreateTime());
+            list.add(map);
+        }
+        return list;
+    }
+
+    public static List<Map<String, Object>> productReviewMedia(List<ProductReviewMedia> mediaList) {
+        List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+        if (mediaList == null) return list;
+        for (ProductReviewMedia media : mediaList) {
+            Map<String, Object> map = new LinkedHashMap<String, Object>();
+            map.put("mediaId", media.getMediaId());
+            map.put("id", media.getMediaId());
+            map.put("reviewId", media.getReviewId());
+            map.put("productId", media.getProductId());
+            map.put("mediaType", media.getMediaType());
+            map.put("mediaUrl", media.getMediaUrl());
+            map.put("fileName", media.getFileName());
+            map.put("fileSize", media.getFileSize());
+            map.put("sortNo", media.getSortNo());
+            map.put("status", media.getStatus());
+            map.put("createTime", media.getCreateTime());
             list.add(map);
         }
         return list;

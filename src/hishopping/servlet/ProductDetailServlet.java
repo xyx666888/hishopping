@@ -30,6 +30,7 @@ public class ProductDetailServlet extends HttpServlet {
             User user = ServletUtil.currentUser(request);
             if (user != null) messageDao.logProductView(user.getId(), product.getId(), product.getMerchantId());
             result.put("reviews", ServletUtil.productReviews(businessService.productReviews(product.getId(), "USER", user == null ? 0 : user.getId())));
+            result.put("reviewStats", businessService.reviewStatsForProduct(product.getId()));
         }
         JsonUtil.write(response, result);
     }

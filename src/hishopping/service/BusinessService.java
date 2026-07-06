@@ -33,8 +33,12 @@ public class BusinessService {
     }
 
     public void review(int orderId, int productId, int userId, int rating, String content) {
+        review(orderId, productId, userId, rating, content, false, "");
+    }
+
+    public int review(int orderId, int productId, int userId, int rating, String content, boolean anonymous, String mediaIds) {
         if (rating < 1 || rating > 5) throw new RuntimeException("\u8bc4\u5206\u9700\u5728 1-5 \u5206\u4e4b\u95f4\u3002");
-        dao.createReview(orderId, productId, userId, rating, content);
+        return dao.createReview(orderId, productId, userId, rating, content, anonymous, mediaIds);
     }
 
     public List<AfterSale> userAfterSales(int userId) { return dao.afterSalesForUser(userId); }
@@ -42,10 +46,14 @@ public class BusinessService {
     public List<AfterSale> allAfterSales() { return dao.allAfterSales(); }
     public List<ProductReview> productReviews(int productId) { return dao.reviewsForProduct(productId); }
     public List<ProductReview> productReviews(int productId, String actorType, int actorId) { return dao.reviewsForProduct(productId, actorType, actorId); }
+    public List<ProductReview> productReviews(int productId, String actorType, int actorId, String filter, int rating) { return dao.reviewsForProduct(productId, actorType, actorId, filter, rating); }
     public List<ReviewReply> reviewReplies(int reviewId) { return dao.repliesForReview(reviewId); }
     public void likeReview(int reviewId, String actorType, int actorId) { dao.likeReview(reviewId, actorType, actorId); }
+    public java.util.Map<String, Object> toggleReviewLike(int reviewId, String actorType, int actorId) { return dao.toggleReviewLike(reviewId, actorType, actorId); }
     public void replyReview(int reviewId, String actorType, int actorId, String actorName, String actorAvatar, String content) { dao.replyReview(reviewId, actorType, actorId, actorName, actorAvatar, content); }
     public java.util.Map<String, Object> reviewStatsForUser(int userId) { return dao.reviewStatsForUser(userId); }
+    public java.util.Map<String, Object> reviewStatsForProduct(int productId) { return dao.reviewStatsForProduct(productId); }
+    public int saveReviewMedia(String ownerType, int ownerId, int productId, String mediaType, String mediaUrl, String fileName, long fileSize) { return dao.saveReviewMedia(ownerType, ownerId, productId, mediaType, mediaUrl, fileName, fileSize); }
     public List<GrowthLog> growthLogs(int userId) { return dao.growthLogsForUser(userId); }
     public List<AdminOperationLog> adminLogsForUser(int userId) { return dao.adminLogsForUser(userId); }
     public List<AdminOperationLog> allAdminLogs() { return dao.allAdminLogs(); }

@@ -130,6 +130,7 @@ BEGIN
         spec_options NVARCHAR(200) NOT NULL,
         sku_attrs NVARCHAR(MAX) NULL,
         sku_options NVARCHAR(MAX) NULL,
+        product_attrs NVARCHAR(MAX) NULL,
         status NVARCHAR(20) NOT NULL DEFAULT N'上架中',
         create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         CONSTRAINT FK_hishopping_product_category FOREIGN KEY(category_id) REFERENCES dbo.hishopping_category(id)
@@ -463,6 +464,8 @@ IF COL_LENGTH('dbo.hishopping_product', 'sku_options') IS NULL
     ALTER TABLE dbo.hishopping_product ADD sku_options NVARCHAR(MAX) NULL;
 IF COL_LENGTH('dbo.hishopping_product', 'sku_attrs') IS NULL
     ALTER TABLE dbo.hishopping_product ADD sku_attrs NVARCHAR(MAX) NULL;
+IF COL_LENGTH('dbo.hishopping_product', 'product_attrs') IS NULL
+    ALTER TABLE dbo.hishopping_product ADD product_attrs NVARCHAR(MAX) NULL;
 IF COL_LENGTH('dbo.hishopping_cart_item', 'selected_color') IS NULL
     ALTER TABLE dbo.hishopping_cart_item ADD selected_color NVARCHAR(50) NULL;
 IF COL_LENGTH('dbo.hishopping_cart_item', 'selected_spec') IS NULL
@@ -781,6 +784,7 @@ BEGIN
         user_id INT NOT NULL,
         rating INT NOT NULL,
         content NVARCHAR(1000) NULL,
+        anonymous_flag BIT NOT NULL DEFAULT 0,
         status NVARCHAR(20) NOT NULL DEFAULT N'ACTIVE',
         like_count INT NOT NULL DEFAULT 0,
         create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
@@ -798,6 +802,8 @@ IF COL_LENGTH('dbo.hishop_product_review', 'like_count') IS NULL
     ALTER TABLE dbo.hishop_product_review ADD like_count INT NOT NULL CONSTRAINT DF_hishop_product_review_like_count DEFAULT 0;
 IF COL_LENGTH('dbo.hishop_product_review', 'update_time') IS NULL
     ALTER TABLE dbo.hishop_product_review ADD update_time DATETIME2 NULL;
+IF COL_LENGTH('dbo.hishop_product_review', 'anonymous_flag') IS NULL
+    ALTER TABLE dbo.hishop_product_review ADD anonymous_flag BIT NOT NULL CONSTRAINT DF_hishop_product_review_anonymous_flag DEFAULT 0;
 GO
 
 IF OBJECT_ID(N'dbo.hishopping_review_reply', N'U') IS NULL
@@ -830,12 +836,35 @@ BEGIN
 END
 GO
 
+IF OBJECT_ID(N'dbo.hishop_product_review_media', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.hishop_product_review_media (
+        media_id INT IDENTITY(1,1) PRIMARY KEY,
+        review_id INT NULL,
+        owner_type NVARCHAR(20) NOT NULL,
+        owner_id INT NOT NULL,
+        product_id INT NOT NULL,
+        media_type NVARCHAR(20) NOT NULL,
+        media_url NVARCHAR(500) NOT NULL,
+        file_name NVARCHAR(200) NULL,
+        file_size BIGINT NOT NULL DEFAULT 0,
+        sort_no INT NOT NULL DEFAULT 0,
+        status NVARCHAR(20) NOT NULL DEFAULT N'TEMP',
+        create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME()
+    );
+END
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_product_review_product_status' AND object_id = OBJECT_ID(N'dbo.hishop_product_review'))
     EXEC(N'CREATE INDEX IX_hishop_product_review_product_status ON dbo.hishop_product_review(product_id, status, create_time DESC);');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishopping_review_reply_review' AND object_id = OBJECT_ID(N'dbo.hishopping_review_reply'))
     EXEC(N'CREATE INDEX IX_hishopping_review_reply_review ON dbo.hishopping_review_reply(review_id, create_time ASC);');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishopping_review_like_review' AND object_id = OBJECT_ID(N'dbo.hishopping_review_like'))
     EXEC(N'CREATE INDEX IX_hishopping_review_like_review ON dbo.hishopping_review_like(review_id);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_product_review_media_review' AND object_id = OBJECT_ID(N'dbo.hishop_product_review_media'))
+    EXEC(N'CREATE INDEX IX_hishop_product_review_media_review ON dbo.hishop_product_review_media(review_id, status, sort_no, media_id);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_product_review_media_owner' AND object_id = OBJECT_ID(N'dbo.hishop_product_review_media'))
+    EXEC(N'CREATE INDEX IX_hishop_product_review_media_owner ON dbo.hishop_product_review_media(owner_type, owner_id, status, create_time DESC);');
 GO
 
 IF OBJECT_ID(N'dbo.hishop_growth_log', N'U') IS NULL

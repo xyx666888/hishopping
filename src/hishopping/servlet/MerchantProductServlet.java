@@ -76,6 +76,7 @@ public class MerchantProductServlet extends HttpServlet {
                 p.setSpecOptions(request.getParameter("specOptions"));
                 p.setSkuAttrs(request.getParameter("skuAttrs"));
                 p.setSkuOptions(request.getParameter("skuOptions"));
+                p.setProductAttrs(request.getParameter("productAttrs"));
                 if ("update".equals(action)) service.update(p, true); else service.add(p);
             }
             Map<String, Object> result = ServletUtil.ok();

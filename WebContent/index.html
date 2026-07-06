@@ -6,7 +6,7 @@
 	<title>嗨购商城 购物平台</title>
 	<link rel="icon" type="image/png" sizes="64x64" href="assets/img/favicon.png?v=site-logo-20260614">
 	<link rel="apple-touch-icon" sizes="180x180" href="assets/img/apple-touch-icon.png?v=site-logo-20260614">
-	<link rel="stylesheet" href="assets/css/style.css?v=settings-form-20260701-6">
+	<link rel="stylesheet" href="assets/css/style.css?v=captcha-20260705-1">
 </head>
 <body>
 	<section id="authPage" class="auth-page">
@@ -48,6 +48,13 @@
 						<label class="field"><span>店铺简介</span><input id="merchantDesc" type="text" placeholder="一句话介绍店铺"></label>
 					</div>
 					<label class="field"><span>密码</span><input id="passwordInput" type="password" placeholder="请输入密码"></label>
+					<div id="captchaField" class="captcha-field hidden">
+						<label class="field captcha-input-field"><span>验证码</span><input id="captchaInput" type="text" maxlength="4" autocomplete="off" placeholder="请输入验证码"></label>
+						<div class="captcha-actions">
+							<img id="captchaImage" class="captcha-image" src="" alt="验证码" title="点击刷新验证码">
+							<button id="captchaRefresh" class="captcha-refresh" type="button" title="刷新验证码" aria-label="刷新验证码">↻</button>
+						</div>
+					</div>
 					<button class="primary-btn full" id="enterBtn" type="button">登录进入</button>
 					<p id="formMessage" class="form-message"></p>
 				</form>
@@ -99,6 +106,6 @@
 		})();
 	</script>
 	<script charset="UTF-8" src="assets/js/regions-mainland.js?v=utf8-login-20260630"></script>
-	<script charset="UTF-8" src="assets/js/app.js?v=stability-20260701-11"></script>
+	<script charset="UTF-8" src="assets/js/app.js?v=captcha-20260705-1"></script>
 </body>
 </html>

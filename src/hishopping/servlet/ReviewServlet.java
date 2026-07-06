@@ -43,7 +43,12 @@ public class ReviewServlet extends HttpServlet {
             return;
         }
         int productId = ServletUtil.intParam(request, "productId", 0);
-        List<ProductReview> reviews = businessService.productReviews(productId, actor.type, actor.id);
+        String filter = request.getParameter("filter");
+        int rating = ServletUtil.intParam(request, "rating", 0);
+        List<ProductReview> reviews = businessService.productReviews(productId, actor.type, actor.id, filter, rating);
+        result.put("stats", businessService.reviewStatsForProduct(productId));
+        result.put("filter", filter == null || filter.length() == 0 ? "all" : filter);
+        result.put("rating", rating);
         result.put("reviews", reviewMaps(reviews));
         JsonUtil.write(response, result);
     }
@@ -58,18 +63,23 @@ public class ReviewServlet extends HttpServlet {
                     return;
                 }
                 String content = request.getParameter("content");
-                if (content == null || content.trim().length() == 0) {
+                String mediaIds = request.getParameter("mediaIds");
+                if ((content == null || content.trim().length() == 0) && (mediaIds == null || mediaIds.trim().length() == 0)) {
                     JsonUtil.write(response, ServletUtil.fail("请填写评论内容。"));
                     return;
                 }
-                businessService.review(
+                int newReviewId = businessService.review(
                     ServletUtil.intParam(request, "orderId", 0),
                     ServletUtil.intParam(request, "productId", 0),
                     user.getId(),
                     ServletUtil.intParam(request, "rating", 5),
-                    content.trim()
+                    content == null ? "" : content.trim(),
+                    "true".equalsIgnoreCase(request.getParameter("anonymous")),
+                    mediaIds
                 );
-                JsonUtil.write(response, ServletUtil.ok());
+                Map<String, Object> ok = ServletUtil.ok();
+                ok.put("reviewId", newReviewId);
+                JsonUtil.write(response, ok);
                 return;
             }
             Actor actor = actor(request);
@@ -79,13 +89,16 @@ public class ReviewServlet extends HttpServlet {
             }
             int reviewId = ServletUtil.intParam(request, "reviewId", 0);
             if ("like".equals(action)) {
-                businessService.likeReview(reviewId, actor.type, actor.id);
-                JsonUtil.write(response, ServletUtil.ok());
+                Map<String, Object> ok = ServletUtil.ok();
+                ok.putAll(businessService.toggleReviewLike(reviewId, actor.type, actor.id));
+                JsonUtil.write(response, ok);
                 return;
             }
             if ("reply".equals(action)) {
                 businessService.replyReview(reviewId, actor.type, actor.id, actor.name, actor.avatar, request.getParameter("content"));
-                JsonUtil.write(response, ServletUtil.ok());
+                Map<String, Object> ok = ServletUtil.ok();
+                ok.put("replies", ServletUtil.reviewReplies(businessService.reviewReplies(reviewId)));
+                JsonUtil.write(response, ok);
                 return;
             }
             JsonUtil.write(response, ServletUtil.fail("评论操作不正确。"));

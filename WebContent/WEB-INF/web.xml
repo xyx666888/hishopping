@@ -55,6 +55,14 @@
 		<url-pattern>/register</url-pattern>
 	</servlet-mapping>
 	<servlet>
+		<servlet-name>CaptchaServlet</servlet-name>
+		<servlet-class>hishopping.servlet.CaptchaServlet</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>CaptchaServlet</servlet-name>
+		<url-pattern>/captcha</url-pattern>
+	</servlet-mapping>
+	<servlet>
 		<servlet-name>LogoutServlet</servlet-name>
 		<servlet-class>hishopping.servlet.LogoutServlet</servlet-class>
 	</servlet>
@@ -93,6 +101,19 @@
 	<servlet-mapping>
 		<servlet-name>ReviewServlet</servlet-name>
 		<url-pattern>/reviews</url-pattern>
+	</servlet-mapping>
+	<servlet>
+		<servlet-name>ReviewMediaUploadServlet</servlet-name>
+		<servlet-class>hishopping.servlet.ReviewMediaUploadServlet</servlet-class>
+		<multipart-config>
+			<max-file-size>83886080</max-file-size>
+			<max-request-size>94371840</max-request-size>
+			<file-size-threshold>1048576</file-size-threshold>
+		</multipart-config>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>ReviewMediaUploadServlet</servlet-name>
+		<url-pattern>/reviewMediaUpload</url-pattern>
 	</servlet-mapping>
 	<servlet>
 		<servlet-name>CartServlet</servlet-name>

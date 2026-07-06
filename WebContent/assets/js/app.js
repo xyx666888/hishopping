@@ -62,6 +62,11 @@ var state = {
 	favorites: [],
 	productReviews: [],
 	reviewStats: { reviewCount: 0, likedCount: 0 },
+	productReviewStats: { totalCount: 0, averageRating: 0, mediaCount: 0, starCounts: {} },
+	reviewFilter: "all",
+	reviewRatingFilter: 0,
+	reviewDraftMedia: [],
+	activeReviewReplyId: null,
 	merchantAnalytics: null,
 	adminAnalytics: null,
 	merchantAuditFilter: "pending",
@@ -117,6 +122,7 @@ function cloneCoupons(coupons) {
 var couponCatalog = cloneCoupons(state.coupons);
 var orderRefreshTimer = null;
 var toastTimer = null;
+var captchaVisible = false;
 
 var userNavItems = [
 	{ key: "home", label: "购物主页", icon: "assets/img/nav-home.png" },
@@ -241,6 +247,39 @@ function post(url, data) {
 
 function get(url) {
 	return fetch(apiUrl(url)).then(parseJsonResponse);
+}
+
+function needsRegisterCaptcha() {
+	return state.authType !== "login" && (state.authMode === "user" || state.authMode === "merchant");
+}
+
+function refreshCaptcha() {
+	var img = document.getElementById("captchaImage");
+	if (!img) return;
+	img.src = apiUrl("captcha") + "?t=" + Date.now() + Math.floor(Math.random() * 1000);
+}
+
+function clearCaptchaInput() {
+	var input = document.getElementById("captchaInput");
+	if (input) input.value = "";
+}
+
+function resetCaptcha() {
+	clearCaptchaInput();
+	refreshCaptcha();
+}
+
+function updateCaptchaView(show) {
+	var field = document.getElementById("captchaField");
+	if (!field) return;
+	field.classList.toggle("hidden", !show);
+	if (show && !captchaVisible) {
+		resetCaptcha();
+	}
+	if (!show) {
+		clearCaptchaInput();
+	}
+	captchaVisible = show;
 }
 
 function uploadFormData(url, formData, onProgress) {
@@ -539,6 +578,22 @@ function productAttrs(product) {
 	if (product && product.specOptions && product.specOptions.length) attrs.push({ name: "规格", values: product.specOptions });
 	if (!attrs.length) attrs.push({ name: "规格", values: ["默认"] });
 	return attrs;
+}
+
+function productDisplayAttrs(product) {
+	var raw = product && product.productAttrs || [];
+	if (typeof raw === "string") {
+		try { raw = JSON.parse(raw || "[]"); } catch (e) { raw = []; }
+	}
+	if (!Array.isArray(raw)) raw = [];
+	return raw.map(function(attr) {
+		return {
+			name: String(attr && attr.name || "").trim(),
+			value: String(attr && attr.value || "").trim()
+		};
+	}).filter(function(attr) {
+		return attr.name && attr.value;
+	}).slice(0, 20);
 }
 
 function skuText(sku) {
@@ -932,10 +987,15 @@ function loadProducts() {
 function loadProductReviews(productId) {
 	if (!productId) {
 		state.productReviews = [];
+		state.productReviewStats = { totalCount: 0, averageRating: 0, mediaCount: 0, starCounts: {} };
 		return Promise.resolve();
 	}
-	return get("reviews?productId=" + encodeURIComponent(productId)).then(function(data) {
+	var query = "reviews?productId=" + encodeURIComponent(productId);
+	if (state.reviewFilter === "media") query += "&filter=media";
+	if (Number(state.reviewRatingFilter || 0) > 0) query += "&rating=" + encodeURIComponent(state.reviewRatingFilter);
+	return get(query).then(function(data) {
 		state.productReviews = data.success ? (data.reviews || []) : [];
+		state.productReviewStats = data.success ? (data.stats || state.productReviewStats || {}) : { totalCount: 0, averageRating: 0, mediaCount: 0, starCounts: {} };
 	});
 }
 
@@ -1246,6 +1306,12 @@ function openDetail(productId, sourcePage) {
 		if (data.success) {
 			state.detailReturnPage = sourcePage || (state.page === "detail" ? state.detailReturnPage : state.page) || "home";
 			state.selectedProduct = data.product;
+			state.productReviews = data.reviews || [];
+			state.productReviewStats = data.reviewStats || state.productReviewStats || {};
+			state.reviewFilter = "all";
+			state.reviewRatingFilter = 0;
+			state.reviewDraftMedia = [];
+			state.activeReviewReplyId = null;
 			state.detailMediaIndex = 0;
 			syncDetailOptions();
 			setPage("detail");
@@ -1310,6 +1376,71 @@ function renderProductReviews(product) {
 	return '<section class="panel-card product-review-panel"><div class="section-head"><div><h2>评论评分</h2><p>商品评分、评论数和点赞数会参与推荐、热门、精选和发现排序。</p></div><div class="review-summary"><b>★ ' + Number(product.rating || 0).toFixed(1) + '</b><span>' + Number(product.reviewCount || reviews.length || 0) + ' 条评价</span></div></div>' + form + '<div class="review-list">' + rows + '</div></section>';
 }
 
+function renderProductReviews(product) {
+	var reviews = state.productReviews || [];
+	var stats = state.productReviewStats || {};
+	var starCounts = stats.starCounts || {};
+	var filters = [
+		{ key: "all", rating: 0, label: "全部", count: Number(stats.totalCount || stats.reviewCount || 0) },
+		{ key: "media", rating: 0, label: "有图/视频", count: Number(stats.mediaCount || 0) },
+		{ key: "rating", rating: 5, label: "★★★★★", count: Number(starCounts["5"] || 0) },
+		{ key: "rating", rating: 4, label: "★★★★", count: Number(starCounts["4"] || 0) },
+		{ key: "rating", rating: 3, label: "★★★", count: Number(starCounts["3"] || 0) },
+		{ key: "rating", rating: 2, label: "★★", count: Number(starCounts["2"] || 0) },
+		{ key: "rating", rating: 1, label: "★", count: Number(starCounts["1"] || 0) }
+	];
+	var filterHtml = filters.map(function(item) {
+		var active = (item.key === "media" && state.reviewFilter === "media") || (item.key === "all" && state.reviewFilter !== "media" && Number(state.reviewRatingFilter || 0) === 0) || (item.key === "rating" && Number(state.reviewRatingFilter || 0) === item.rating);
+		return '<button class="review-filter-btn ' + (active ? "active" : "") + '" data-filter="' + item.key + '" data-rating="' + item.rating + '" type="button">' + item.label + ' <span>' + item.count + '</span></button>';
+	}).join("");
+	var rows = reviews.map(function(review) {
+		var reviewId = review.reviewId || review.id;
+		var media = (review.mediaList || []).map(function(item) {
+			var url = escapeHtml(item.mediaUrl || "");
+			return String(item.mediaType || "IMAGE").toUpperCase() === "VIDEO"
+				? '<video class="review-video" src="' + url + '" controls preload="metadata"></video>'
+				: '<button class="review-media-img" data-src="' + url + '" type="button"><img src="' + url + '" alt="评价图片"></button>';
+		}).join("");
+		var sku = [review.skuText, review.selectedColor, review.selectedSpec].filter(function(value, index, arr) {
+			return value && arr.indexOf(value) === index;
+		}).join(" / ");
+		var replies = (review.replies || []).map(function(reply) {
+			var role = roleName(reply.userType);
+			var name = reply.userName || role;
+			return '<div class="review-reply"><b>' + escapeHtml(role ? role + " · " + name : name) + '</b><span>' + escapeHtml(reply.content || "") + '</span><time>' + escapeHtml(shortDate(reply.createTime || "")) + '</time></div>';
+		}).join("");
+		var replyForm = state.activeReviewReplyId === reviewId ? '<form class="review-reply-form" data-id="' + reviewId + '"><textarea rows="2" placeholder="写下你的回复"></textarea><div><button class="ghost-btn review-reply-cancel" type="button">取消</button><button class="primary-btn" type="submit">发布回复</button></div></form>' : "";
+		return '<article class="review-item">' +
+			avatarMarkup(review.userAvatar, String(review.username || "匿").charAt(0), "review-avatar") +
+			'<div class="review-body"><div class="review-head"><strong>' + escapeHtml(review.username || "匿名用户") + '</strong><span class="rating">' + reviewStars(review.rating) + '</span><time>' + escapeHtml(shortDate(review.createTime || "")) + '</time></div>' +
+			(sku ? '<div class="review-sku">' + escapeHtml(sku) + '</div>' : '') +
+			'<p>' + escapeHtml(review.content || "这位用户上传了图片/视频，没有填写文字评价。") + '</p>' +
+			(media ? '<div class="review-media-grid">' + media + '</div>' : '') +
+			'<div class="review-actions"><button class="ghost-btn review-like ' + (review.liked ? "active" : "") + '" data-id="' + reviewId + '" type="button">赞 <span>' + Number(review.likeCount || 0) + '</span></button><button class="ghost-btn review-reply-open" data-id="' + reviewId + '" type="button">回复</button></div>' +
+			(replies ? '<div class="review-replies">' + replies + '</div>' : '') + replyForm + '</div></article>';
+	}).join("") || '<div class="empty-cart compact-empty"><h3>暂无评价</h3><p class="muted">完成订单后可以发表真实评价，帮助其他用户判断这件商品是否适合自己。</p></div>';
+	var options = state.user ? reviewableOrderOptions(product.id) : "";
+	var draftMedia = (state.reviewDraftMedia || []).map(function(item, index) {
+		var url = escapeHtml(item.mediaUrl || "");
+		var preview = String(item.mediaType || "IMAGE").toUpperCase() === "VIDEO" ? '<video src="' + url + '" controls preload="metadata"></video>' : '<img src="' + url + '" alt="待提交媒体">';
+		return '<div class="review-draft-media">' + preview + '<button class="review-media-remove" data-index="' + index + '" type="button">×</button></div>';
+	}).join("");
+	var form = "";
+	if (state.user) {
+		form = options ? '<form class="review-form" id="detailReviewForm"><label class="field"><span>评价订单</span><select id="detailReviewOrder">' + options + '</select></label><label class="field"><span>评分</span><select id="detailReviewRating"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></label><label class="field wide"><span>评价内容</span><textarea id="detailReviewContent" rows="3" placeholder="分享真实体验，支持 emoji 😊"></textarea></label><div class="review-form-tools"><button class="review-emoji" data-emoji="😊" type="button">😊</button><button class="review-emoji" data-emoji="👍" type="button">👍</button><button class="review-emoji" data-emoji="✨" type="button">✨</button><label class="review-anonymous"><input id="detailReviewAnonymous" type="checkbox"> 匿名评价</label><label class="ghost-btn review-upload-btn">上传图片/视频<input id="detailReviewMedia" type="file" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" multiple></label></div>' + (draftMedia ? '<div class="review-draft-grid">' + draftMedia + '</div>' : '') + '<button class="primary-btn" type="submit">提交评价</button></form>' : '<p class="muted review-hint">购买并完成该商品订单后，可以在这里或订单页发表评价。</p>';
+	} else {
+		form = '<p class="muted review-hint">登录后可以点赞、回复；购买并完成订单后可以发表评价。</p>';
+	}
+	return '<section class="panel-card product-review-panel"><div class="section-head"><div><h2>评论评分</h2><p>真实购买后的评价会参与商品评分和推荐排序。</p></div><div class="review-summary"><b>' + Number(stats.averageRating || product.rating || 0).toFixed(1) + '</b><span>' + Number(stats.totalCount || product.reviewCount || reviews.length || 0) + ' 条评价</span></div></div><div class="review-stats-row"><span>有图/视频 ' + Number(stats.mediaCount || 0) + '</span><span>★★★★★ ' + Number(starCounts["5"] || 0) + '</span><span>★★★★ ' + Number(starCounts["4"] || 0) + '</span><span>★★★及以下 ' + (Number(starCounts["3"] || 0) + Number(starCounts["2"] || 0) + Number(starCounts["1"] || 0)) + '</span></div><div class="review-filters">' + filterHtml + '</div>' + form + '<div class="review-list">' + rows + '</div></section>';
+}
+
+function reviewStars(rating) {
+	var n = Math.max(1, Math.min(5, Number(rating || 5)));
+	var html = "";
+	for (var i = 1; i <= 5; i++) html += i <= n ? "★" : "☆";
+	return html;
+}
+
 function syncDetailOptions() {
 	var product = state.selectedProduct;
 	if (!product) return;
@@ -1354,6 +1485,12 @@ function renderHallHero(previewOnly) {
 	return '<div class="hall-carousel' + linkClass + (banner.overlayEnabled === false ? " no-overlay" : "") + '" data-index="' + index + '">' + media + copy + sound + controls + '</div>';
 }
 
+function renderHallStatsCard() {
+	var onSaleCount = state.products.filter(function(p) { return p.status !== "下架" && p.saleStatus !== "OFF_SALE" && p.auditStatus !== "PENDING"; }).length;
+	return '<div class="stats-card"><div class="section-head"><h3>今日数据</h3>' + badge("实时") + '</div>' +
+		'<div class="stat-row"><span>在售商品</span><b>' + onSaleCount + '</b></div><div class="stat-row"><span>购物车商品</span><b>' + cartCount() + '</b></div><div class="stat-row"><span>可用优惠券</span><b>' + state.coupons.length + '</b></div></div>';
+}
+
 function renderHome() {
 	var feedInfo = activeFeedInfo();
 	var categoryHtml = smartFeeds.map(function(feed) {
@@ -1384,14 +1521,20 @@ function renderHome() {
 	var couponCollapsed = !!state.couponCenterCollapsed;
 	var couponToggleBtn = '<button class="coupon-collapse-toggle ' + (couponCollapsed ? "is-collapsed" : "") + '" type="button" aria-expanded="' + (!couponCollapsed) + '" aria-controls="homeCouponGrid" title="' + (couponCollapsed ? "展开优惠券" : "收起优惠券") + '"><span>' + (couponCollapsed ? "展开" : "收起") + '</span><b>^</b></button>';
 	var couponPanel = couponCollapsed ? '<div class="coupon-collapsed-note" id="homeCouponGrid"><span>优惠券列表已收起</span><strong>' + state.coupons.length + '</strong><small>张优惠券可查看</small></div>' : '<div class="coupon-grid home-coupon-grid" id="homeCouponGrid">' + couponHtml + '</div>';
-	var onSaleCount = state.products.filter(function(p) { return p.status !== "下架" && p.saleStatus !== "OFF_SALE" && p.auditStatus !== "PENDING"; }).length;
 	return '<section class="hero-grid">' +
 		renderHallHero(false) +
-		'<div class="stats-card"><div class="section-head"><h3>今日数据</h3>' + badge("实时") + '</div>' +
-		'<div class="stat-row"><span>在售商品</span><b>' + onSaleCount + '</b></div><div class="stat-row"><span>购物车商品</span><b>' + cartCount() + '</b></div><div class="stat-row"><span>可用优惠券</span><b>' + state.coupons.length + '</b></div></div>' +
+		renderHallStatsCard() +
 		'</section><section class="category-grid">' + categoryHtml + '</section>' +
 		'<section class="coupon-strip ' + (couponCollapsed ? "collapsed" : "") + '" id="couponCenter"><div class="section-head coupon-section-head"><div><h3>优惠券中心</h3><p>后台发放后可在购物车结算时选择使用。</p></div><div class="coupon-head-actions">' + claimAllBtn + couponToggleBtn + '</div></div>' + couponPanel + '</section>' +
 		'<section id="productCenter"><div class="section-head"><div><h3>' + escapeHtml(feedInfo.title) + '</h3><p>' + escapeHtml(feedInfo.subtitle) + '</p></div><button class="ghost-btn show-all-products" type="button">刷新推荐</button></div><div class="product-grid">' + productHtml + '</div></section>';
+}
+
+function renderProductDisplayAttrs(product) {
+	var attrs = productDisplayAttrs(product);
+	if (!attrs.length) return "";
+	return '<section class="detail-product-attrs"><div class="detail-product-attrs-head"><strong>商品属性</strong><span>展示信息，不参与规格和库存计算</span></div><div class="detail-product-attrs-list">' + attrs.map(function(attr) {
+		return '<p><strong>' + escapeHtml(attr.name) + '：</strong><span>' + escapeHtml(attr.value) + '</span></p>';
+	}).join("") + '</div></section>';
 }
 
 function renderDetail() {
@@ -1413,7 +1556,7 @@ function renderDetail() {
 	var subtotal = Number(sku && sku.price || product.price || 0) * state.detailQuantity;
 	var contactBtn = product.merchantId ? '<button class="ghost-btn detail-contact-merchant" data-merchant="' + product.merchantId + '" data-product="' + product.id + '" type="button">联系商家</button>' : '<button class="ghost-btn detail-contact-admin" data-product="' + product.id + '" type="button">联系平台</button>';
 	return '<div class="detail-page-head"><button class="detail-back-btn" type="button" title="返回"><img src="assets/img/back-return.png" alt="返回"></button><div><h2>商品详情</h2><p>查看规格、库存、优惠和店铺信息。</p></div></div><div class="detail-grid"><div class="panel-card detail-media-panel">' + productMediaCarousel(product) +
-		'<div class="detail-benefits"><span>正品保障</span><span>极速发货</span><span>7天无理由</span></div></div>' +
+		renderProductDisplayAttrs(product) + '<div class="detail-benefits"><span>正品保障</span><span>极速发货</span><span>7天无理由</span></div></div>' +
 		'<div class="panel-card detail-info"><div class="detail-title-actions"><div>' + badge(product.tag) + ' ' + badge("销量 " + product.sales, "green") + ' ' + badge("评分 " + product.rating, "amber") + '</div>' + favoriteButton(product.id, "detail-favorite") + '</div>' +
 		'<h2>' + escapeHtml(product.name) + '</h2><p class="muted">' + escapeHtml(product.detailDesc) + '</p>' +
 		'<div class="product-flags detail-flags">' + productBusinessBadges(product) + '</div>' +
@@ -1752,7 +1895,7 @@ function renderAdminHall() {
 		var linkText = b.linkEnabled ? (b.linkType === "PRODUCT" ? "商品 #" + b.productId : "页面 " + pageTitleText(b.linkTarget || "")) : "不跳转";
 		return '<tr><td>' + b.id + '</td><td><div class="hall-admin-thumb">' + preview + '</div></td><td><b>' + escapeHtml(b.title || "未命名") + '</b><p class="muted">' + escapeHtml(b.subtitle || "") + '</p><p class="muted">' + (b.overlayEnabled === false ? "不显示标题层" : "标题层：" + positionText(b.textPosition)) + '</p></td><td>' + escapeHtml(b.mediaType || "IMAGE") + '</td><td>' + b.sortNo + '</td><td>' + badge(b.enabled ? "启用" : "禁用", b.enabled ? "green" : "amber") + '</td><td>' + escapeHtml(linkText) + '</td><td><button class="ghost-btn hall-edit" data-id="' + b.id + '" type="button">编辑</button><button class="ghost-btn hall-delete" data-id="' + b.id + '" type="button">删除</button></td></tr>';
 	}).join("") || '<tr><td colspan="8">暂无大厅展示项，上传图片或视频后保存即可。</td></tr>';
-	return '<section class="panel-card admin-section hall-admin-page"><div class="section-head"><div><h2>大厅展示</h2><p>配置用户首页顶部轮播。每一项可单独上传图片或视频，所以列表中可以图片、视频混搭。</p></div></div><div class="hall-admin-preview">' + renderHallHero(true) + '</div><form class="address-form hall-config-form" id="hallBannerForm"><input type="hidden" id="hallId"><input type="hidden" id="hallMediaUrl"><label class="field"><span>上传媒体</span><input id="hallMediaFile" type="file" accept="image/*,video/*"><small id="hallUploadName" class="muted">选择图片或视频，上传成功后保存展示项</small><div class="upload-progress" id="hallUploadProgress"><i></i></div></label><label class="field"><span>媒体类型</span><select id="hallMediaType"><option value="IMAGE">图片</option><option value="VIDEO">视频</option></select></label><label class="field"><span>展示状态</span><select id="hallEnabled"><option value="true">启用</option><option value="false">暂不展示</option></select></label><label class="field"><span>排序</span><input id="hallSortNo" type="number" value="1"></label><label class="field"><span>标题层</span><select id="hallOverlayEnabled"><option value="true">显示标题文字</option><option value="false">只展示媒体</option></select></label><label class="field"><span>文字位置</span><select id="hallTextPosition"><option value="LEFT">左侧</option><option value="CENTER">居中</option><option value="RIGHT">右侧</option></select></label><label class="field"><span>标题颜色</span><input id="hallTitleColor" type="color" value="#ffffff"></label><label class="field"><span>副标题颜色</span><input id="hallSubtitleColor" type="color" value="#e2e8f0"></label><label class="field wide"><span>标题</span><input id="hallTitle" placeholder="如：春夏焕新"></label><label class="field wide"><span>副标题</span><input id="hallSubtitle" placeholder="大厅展示说明"></label><label class="field"><span>点击后跳转</span><select id="hallLinkType"><option value="NONE">不跳转</option><option value="PRODUCT">选择商品详情</option><option value="PAGE">选择内置页面</option></select></label><label class="field hall-product-field"><span>跳转商品</span><select id="hallProductId"><option value="0">请选择商品</option>' + productOptions + '</select></label><label class="field hall-page-field"><span>跳转页面</span><select id="hallLinkTarget"><option value="">请选择页面</option>' + pageOptions + '</select></label><label class="field"><span>视频静音</span><select id="hallMuted"><option value="true">默认静音</option><option value="false">不静音</option></select></label><label class="field"><span>视频进度</span><select id="hallDisableSeek"><option value="false">允许调整</option><option value="true">禁止调整</option></select></label><label class="field"><span>视频暂停</span><select id="hallDisablePause"><option value="false">允许暂停</option><option value="true">禁止暂停</option></select></label><button class="primary-btn" type="submit">保存展示项</button><button class="ghost-btn" id="hallResetForm" type="button">清空表单</button></form><div class="admin-table"><table><thead><tr><th>ID</th><th>预览</th><th>文案</th><th>类型</th><th>排序</th><th>状态</th><th>跳转</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+	return '<section class="panel-card admin-section hall-admin-page"><div class="section-head"><div><h2>大厅展示</h2><p>配置用户首页顶部轮播。每一项可单独上传图片或视频，所以列表中可以图片、视频混搭。</p></div></div><section class="hero-grid hall-admin-preview">' + renderHallHero(true) + renderHallStatsCard() + '</section><form class="address-form hall-config-form" id="hallBannerForm"><input type="hidden" id="hallId"><input type="hidden" id="hallMediaUrl"><label class="field"><span>上传媒体</span><input id="hallMediaFile" type="file" accept="image/*,video/*"><small id="hallUploadName" class="muted">选择图片或视频，上传成功后保存展示项</small><div class="upload-progress" id="hallUploadProgress"><i></i></div></label><label class="field"><span>媒体类型</span><select id="hallMediaType"><option value="IMAGE">图片</option><option value="VIDEO">视频</option></select></label><label class="field"><span>展示状态</span><select id="hallEnabled"><option value="true">启用</option><option value="false">暂不展示</option></select></label><label class="field"><span>排序</span><input id="hallSortNo" type="number" value="1"></label><label class="field"><span>标题层</span><select id="hallOverlayEnabled"><option value="true">显示标题文字</option><option value="false">只展示媒体</option></select></label><label class="field"><span>文字位置</span><select id="hallTextPosition"><option value="LEFT">左侧</option><option value="CENTER">居中</option><option value="RIGHT">右侧</option></select></label><label class="field"><span>标题颜色</span><input id="hallTitleColor" type="color" value="#ffffff"></label><label class="field"><span>副标题颜色</span><input id="hallSubtitleColor" type="color" value="#e2e8f0"></label><label class="field wide"><span>标题</span><input id="hallTitle" placeholder="如：春夏焕新"></label><label class="field wide"><span>副标题</span><input id="hallSubtitle" placeholder="大厅展示说明"></label><label class="field"><span>点击后跳转</span><select id="hallLinkType"><option value="NONE">不跳转</option><option value="PRODUCT">选择商品详情</option><option value="PAGE">选择内置页面</option></select></label><label class="field hall-product-field"><span>跳转商品</span><select id="hallProductId"><option value="0">请选择商品</option>' + productOptions + '</select></label><label class="field hall-page-field"><span>跳转页面</span><select id="hallLinkTarget"><option value="">请选择页面</option>' + pageOptions + '</select></label><label class="field"><span>视频静音</span><select id="hallMuted"><option value="true">默认静音</option><option value="false">不静音</option></select></label><label class="field"><span>视频进度</span><select id="hallDisableSeek"><option value="false">允许调整</option><option value="true">禁止调整</option></select></label><label class="field"><span>视频暂停</span><select id="hallDisablePause"><option value="false">允许暂停</option><option value="true">禁止暂停</option></select></label><button class="primary-btn" type="submit">保存展示项</button><button class="ghost-btn" id="hallResetForm" type="button">清空表单</button></form><div class="admin-table"><table><thead><tr><th>ID</th><th>预览</th><th>文案</th><th>类型</th><th>排序</th><th>状态</th><th>跳转</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
 }
 
 function requestStatusBadge(status) {
@@ -1867,7 +2010,7 @@ function renderMerchantCoupons() {
 	var userRows = (state.merchantCouponUsers || []).map(function(c) {
 		return '<tr><td>' + c.userCouponId + '</td><td>' + escapeHtml(c.couponName || "") + '</td><td>用户 ' + c.userId + '</td><td>' + badge(statusText(c.status), c.status === "UNUSED" ? "green" : "amber") + '</td><td>' + escapeHtml(shortDate(c.receiveTime)) + '</td><td>' + escapeHtml(shortDate(c.expireTime)) + '</td></tr>';
 	}).join("") || '<tr><td colspan="6">暂无用户领取记录。</td></tr>';
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>店铺优惠券</h2><p>商家只能创建和发放本店专属优惠券，结算时仅抵扣本店商品。</p></div></div><form class="address-form" id="merchantCouponForm"><label class="field"><span>优惠券名称</span><input id="mcName" placeholder="如：本店满减券"></label><label class="field"><span>类型</span><select id="mcType"><option value="AMOUNT">满减券</option><option value="DISCOUNT">折扣券</option></select></label><label class="field merchant-coupon-amount"><span>优惠金额</span><input id="mcAmount" type="number" step="0.01" value="5"></label><label class="field merchant-coupon-discount hidden"><span>折扣比例</span><input id="mcDiscountRate" type="number" step="0.01" value="0.95"></label><label class="field"><span>最低消费</span><input id="mcMinAmount" type="number" step="0.01" value="39"></label><label class="field"><span>每人限领</span><input id="mcLimit" type="number" value="1"></label><label class="field"><span>有效天数</span><input id="mcValidDays" type="number" value="30"></label><label class="field wide"><span>使用说明</span><input id="mcDescription" placeholder="仅限本店商品使用"></label><button class="primary-btn" type="submit">保存店铺券</button></form><div class="admin-table"><table><thead><tr><th>ID</th><th>名称</th><th>类型</th><th>限领</th><th>有效</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div><div class="section-head compact-head"><div><h3>发放店铺券</h3><p>支持全体用户、指定用户、本店下单用户和本店购物车用户。</p></div></div>' + renderCouponIssueForm(true) + '<div class="section-head compact-head"><div><h3>领取记录</h3><p>查看用户持有的本店优惠券。</p></div></div><div class="admin-table"><table><thead><tr><th>ID</th><th>优惠券</th><th>用户</th><th>状态</th><th>领取</th><th>过期</th></tr></thead><tbody>' + userRows + '</tbody></table></div></section>';
+	return '<section class="panel-card admin-section merchant-coupon-page"><div class="section-head"><div><h2>店铺优惠券</h2><p>商家只能创建和发放本店专属优惠券，结算时仅抵扣本店商品。</p></div></div><form class="address-form merchant-coupon-form" id="merchantCouponForm"><label class="field"><span>优惠券名称</span><input id="mcName" placeholder="如：本店满减券"></label><label class="field"><span>类型</span><select id="mcType"><option value="AMOUNT">满减券</option><option value="DISCOUNT">折扣券</option></select></label><label class="field merchant-coupon-amount"><span>优惠金额</span><input id="mcAmount" type="number" step="0.01" value="5"></label><label class="field merchant-coupon-discount hidden"><span>折扣比例</span><input id="mcDiscountRate" type="number" step="0.01" value="0.95"></label><label class="field"><span>最低消费</span><input id="mcMinAmount" type="number" step="0.01" value="39"></label><label class="field"><span>每人限领</span><input id="mcLimit" type="number" value="1"></label><label class="field"><span>有效天数</span><input id="mcValidDays" type="number" value="30"></label><label class="field wide"><span>使用说明</span><input id="mcDescription" placeholder="仅限本店商品使用"></label><div class="form-actions"><button class="primary-btn" type="submit">保存店铺券</button></div></form><div class="admin-table merchant-coupon-table"><table><thead><tr><th>ID</th><th>名称</th><th>类型</th><th>限领</th><th>有效</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div><div class="section-head compact-head merchant-coupon-subhead"><div><h3>发放店铺券</h3><p>支持全体用户、指定用户、本店下单用户和本店购物车用户。</p></div></div>' + renderCouponIssueForm(true) + '<div class="section-head compact-head merchant-coupon-subhead"><div><h3>领取记录</h3><p>查看用户持有的本店优惠券。</p></div></div><div class="admin-table merchant-coupon-table"><table><thead><tr><th>ID</th><th>优惠券</th><th>用户</th><th>状态</th><th>领取</th><th>过期</th></tr></thead><tbody>' + userRows + '</tbody></table></div></section>';
 }
 
 function orderItemsSummary(order) {
@@ -2150,6 +2293,62 @@ function renderSkuEditor(product) {
 	return '<div class="field wide sku-editor"><div class="sku-editor-head"><span>商品参数/SKU配置</span><div class="sku-editor-actions"><button class="ghost-btn" id="addSkuAttr" type="button">添加参数</button><button class="ghost-btn" id="generateSkuRows" type="button">生成组合</button></div></div><div id="skuAttrsBox" class="sku-attrs-box">' + skuAttrsHtml(attrs) + '</div><div class="sku-batch-row"><input id="batchSkuPrice" placeholder="批量销售价"><input id="batchSkuOldPrice" placeholder="批量原价"><input id="batchSkuStock" placeholder="批量库存"><button class="ghost-btn" id="applySkuBatch" type="button">批量填充</button></div><div class="admin-table sku-editor-table"><table><thead><tr><th>参数组合</th><th>销售价</th><th>原价</th><th>库存</th><th>SKU编码</th><th>SKU图片</th><th>状态</th></tr></thead><tbody id="skuRowsBody">' + skuRowsHtml(rows) + '</tbody></table></div><p class="muted">最多 4 个参数层级、80 个 SKU 组合。修改参数或 SKU 后，商品会重新进入待审核。</p></div>';
 }
 
+function productAttrRowsHtml(attrs) {
+	attrs = attrs || [];
+	if (!attrs.length) return '<div class="product-attrs-empty">可添加产地、品牌、保质期、储存方式等展示信息。</div>';
+	return attrs.map(function(attr, index) {
+		return '<div class="product-attr-row" data-index="' + index + '"><input class="product-attr-name" value="' + escapeHtml(attr.name || "") + '" placeholder="属性名，如产地"><input class="product-attr-value" value="' + escapeHtml(attr.value || "") + '" placeholder="属性值，如上海"><button class="ghost-btn product-attr-delete" type="button">删除</button></div>';
+	}).join("");
+}
+
+function renderProductAttrsEditor(product) {
+	var attrs = productDisplayAttrs(product || {});
+	return '<aside class="product-attrs-editor"><div class="product-attrs-head"><div><span>商品属性</span><small>普通展示属性，不参与 SKU、价格、库存和下单组合计算。</small></div><button class="ghost-btn" id="addProductAttr" type="button">添加属性</button></div><div id="productAttrsBox" class="product-attrs-box">' + productAttrRowsHtml(attrs) + '</div><p class="muted">最多 20 个；空属性行不会保存。</p></aside>';
+}
+
+function readProductAttrs() {
+	var attrs = [];
+	Array.prototype.forEach.call(document.querySelectorAll(".product-attr-row"), function(row) {
+		var name = String(row.querySelector(".product-attr-name").value || "").trim();
+		var value = String(row.querySelector(".product-attr-value").value || "").trim();
+		if (name && value) attrs.push({ name: name, value: value });
+	});
+	return attrs.slice(0, 20);
+}
+
+function updateProductAttrsEditor(attrs) {
+	var box = document.getElementById("productAttrsBox");
+	if (box) box.innerHTML = productAttrRowsHtml((attrs || []).slice(0, 20));
+	bindProductAttrsEditor();
+}
+
+function bindProductAttrsEditor() {
+	var addBtn = document.getElementById("addProductAttr");
+	if (addBtn) {
+		addBtn.onclick = function() {
+			var rows = Array.prototype.map.call(document.querySelectorAll(".product-attr-row"), function(row) {
+				return {
+					name: String(row.querySelector(".product-attr-name").value || "").trim(),
+					value: String(row.querySelector(".product-attr-value").value || "").trim()
+				};
+			});
+			if (rows.length >= 20) {
+				alert("商品属性最多支持 20 个。");
+				return;
+			}
+			rows.push({ name: "", value: "" });
+			updateProductAttrsEditor(rows);
+		};
+	}
+	Array.prototype.forEach.call(document.querySelectorAll(".product-attr-delete"), function(btn) {
+		btn.onclick = function() {
+			var row = btn.closest(".product-attr-row");
+			if (row) row.parentNode.removeChild(row);
+			if (!document.querySelector(".product-attr-row")) updateProductAttrsEditor([]);
+		};
+	});
+}
+
 function readSkuRows() {
 	return Array.prototype.map.call(document.querySelectorAll("#skuRowsBody .sku-row"), function(row, index) {
 		var values = [];
@@ -2273,7 +2472,7 @@ function renderMerchantProductForm(product) {
 		return '<option value="' + c.id + '" ' + (Number(product.categoryId) === Number(c.id) ? "selected" : "") + '>' + escapeHtml(c.name) + '</option>';
 	}).join("");
 	var idInput = product.id ? '<input type="hidden" id="merchantProductId" value="' + product.id + '">' : '';
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>' + (product.id ? "编辑商品" : "新增商品") + '</h2><p>保存后进入待审核，审核通过后按已启用规格展示价格和库存。</p></div></div><form class="address-form" id="merchantProductForm">' + idInput + '<label class="field"><span>商品名称</span><input id="mpName" value="' + escapeHtml(product.name || "") + '"></label><label class="field"><span>商品分类</span><select id="mpCategory">' + options + '</select></label><label class="field"><span>默认价格</span><input id="mpPrice" type="number" step="0.01" value="' + (product.price || "") + '"></label><label class="field"><span>默认原价</span><input id="mpOldPrice" type="number" step="0.01" value="' + (product.oldPrice || "") + '"></label><label class="field"><span>默认库存</span><input id="mpStock" type="number" value="' + (product.stock || 100) + '"></label>' + renderMerchantMediaManager(product) + '<label class="field wide"><span>商品简介</span><input id="mpShortDesc" value="' + escapeHtml(product.shortDesc || "") + '"></label><label class="field wide"><span>商品详情</span><input id="mpDetailDesc" value="' + escapeHtml(product.detailDesc || "") + '"></label>' + renderSkuEditor(product) + '<button class="primary-btn merchant-submit-btn" type="submit">保存并提交审核</button><button class="ghost-btn profile-link merchant-back-btn" data-page="merchantProductList" type="button">返回列表</button></form></section>';
+	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>' + (product.id ? "编辑商品" : "新增商品") + '</h2><p>保存后进入待审核，审核通过后按已启用规格展示价格和库存。</p></div></div><form class="address-form" id="merchantProductForm">' + idInput + '<label class="field"><span>商品名称</span><input id="mpName" value="' + escapeHtml(product.name || "") + '"></label><label class="field"><span>商品分类</span><select id="mpCategory">' + options + '</select></label><label class="field"><span>默认价格</span><input id="mpPrice" type="number" step="0.01" value="' + (product.price || "") + '"></label><label class="field"><span>默认原价</span><input id="mpOldPrice" type="number" step="0.01" value="' + (product.oldPrice || "") + '"></label><label class="field"><span>默认库存</span><input id="mpStock" type="number" value="' + (product.stock || 100) + '"></label>' + renderMerchantMediaManager(product) + '<label class="field wide"><span>商品简介</span><input id="mpShortDesc" value="' + escapeHtml(product.shortDesc || "") + '"></label><label class="field wide"><span>商品详情</span><input id="mpDetailDesc" value="' + escapeHtml(product.detailDesc || "") + '"></label>' + renderSkuEditor(product) + renderProductAttrsEditor(product) + '<button class="primary-btn merchant-submit-btn" type="submit">保存并提交审核</button><button class="ghost-btn merchant-back-btn" data-page="merchantProductList" type="button">返回列表</button></form></section>';
 }
 function adminMerchantProducts(merchantId) {
 	return state.adminAuditProducts.filter(function(p) { return String(p.merchantId) === String(merchantId); });
@@ -2405,7 +2604,7 @@ function renderCouponIssueForm(isMerchant) {
 	var groupValues = String(form.targetValue || "").split(",");
 	var groupOptions = [["NEW", "新用户（注册30天内）"], ["ORDERED", isMerchant ? "本店有订单用户" : "已下单用户"], ["NO_ORDER", "未下单用户"], ["CART", isMerchant ? "本店购物车用户" : "购物车有商品用户"], ["HIGH", "高价值用户"]].map(function(item) { return '<label class="target-group-option"><input type="checkbox" value="' + item[0] + '" ' + (groupValues.indexOf(item[0]) >= 0 ? "checked" : "") + '> ' + item[1] + '</label>'; }).join("");
 	var options = templates.filter(function(c) { return c.status === "ENABLED"; }).map(function(c) { return '<option value="' + c.couponId + '" ' + (String(form.couponId) === String(c.couponId) ? "selected" : "") + '>' + escapeHtml(c.couponName) + ' · ' + couponValueText(c) + '</option>'; }).join("");
-	return '<form class="address-form" id="couponIssueForm" data-merchant="' + (isMerchant ? "1" : "0") + '">' + (!isMerchant ? '<label class="check-field wide"><input id="ciBatch" type="checkbox" ' + (form.batch ? "checked" : "") + '> 批量发放匹配模板</label>' : '<input id="ciBatch" type="checkbox" class="hidden">') + '<label class="field wide"><span>优惠券模板</span><select id="ciCouponId"><option value="">请选择模板</option>' + options + '</select></label><label class="field"><span>发放方式</span><select id="ciIssueType"><option value="VIP_LEVEL" ' + (form.issueType === "VIP_LEVEL" ? "selected" : "") + '>按VIP等级</option><option value="USER" ' + (form.issueType === "USER" ? "selected" : "") + '>按用户ID</option><option value="USERNAME" ' + (form.issueType === "USERNAME" ? "selected" : "") + '>按用户名/手机号</option><option value="USER_GROUP" ' + (form.issueType === "USER_GROUP" ? "selected" : "") + '>按用户类别</option><option value="ALL" ' + (form.issueType === "ALL" ? "selected" : "") + '>全体用户</option></select></label><label class="field"><span>目标值</span><input id="ciTargetValue" value="' + escapeHtml(form.targetValue || "") + '" placeholder="请输入VIP等级，如：5"><details id="ciTargetGroups" class="target-group-select hidden"><summary id="ciTargetGroupSummary">请选择用户类别</summary><div class="target-group-menu">' + groupOptions + '</div></details></label><button class="primary-btn" type="submit">发放优惠券</button></form>';
+	return '<form class="address-form coupon-issue-form ' + (isMerchant ? "merchant-coupon-issue-form" : "admin-coupon-issue-form") + '" id="couponIssueForm" data-merchant="' + (isMerchant ? "1" : "0") + '">' + (!isMerchant ? '<label class="check-field wide"><input id="ciBatch" type="checkbox" ' + (form.batch ? "checked" : "") + '> 批量发放匹配模板</label>' : '<input id="ciBatch" type="checkbox" class="hidden">') + '<label class="field wide"><span>优惠券模板</span><select id="ciCouponId"><option value="">请选择模板</option>' + options + '</select></label><label class="field"><span>发放方式</span><select id="ciIssueType"><option value="VIP_LEVEL" ' + (form.issueType === "VIP_LEVEL" ? "selected" : "") + '>按VIP等级</option><option value="USER" ' + (form.issueType === "USER" ? "selected" : "") + '>按用户ID</option><option value="USERNAME" ' + (form.issueType === "USERNAME" ? "selected" : "") + '>按用户名/手机号</option><option value="USER_GROUP" ' + (form.issueType === "USER_GROUP" ? "selected" : "") + '>按用户类别</option><option value="ALL" ' + (form.issueType === "ALL" ? "selected" : "") + '>全体用户</option></select></label><label class="field"><span>目标值</span><input id="ciTargetValue" value="' + escapeHtml(form.targetValue || "") + '" placeholder="请输入VIP等级，如：5"><details id="ciTargetGroups" class="target-group-select hidden"><summary id="ciTargetGroupSummary">请选择用户类别</summary><div class="target-group-menu">' + groupOptions + '</div></details></label><div class="form-actions"><button class="primary-btn" type="submit">发放优惠券</button></div></form>';
 }
 
 function renderAdminCouponIssueTab() {
@@ -3602,6 +3801,141 @@ function bindPageActions() {
 			});
 		};
 	});
+	Array.prototype.forEach.call(document.querySelectorAll(".review-filter-btn"), function(btn) {
+		btn.onclick = function() {
+			var filter = btn.getAttribute("data-filter") || "all";
+			var rating = Number(btn.getAttribute("data-rating") || 0);
+			state.reviewFilter = filter === "media" ? "media" : "all";
+			state.reviewRatingFilter = filter === "rating" ? rating : 0;
+			if (state.selectedProduct) loadProductReviews(state.selectedProduct.id).then(renderPage);
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".review-emoji"), function(btn) {
+		btn.onclick = function() {
+			var textarea = document.getElementById("detailReviewContent");
+			if (!textarea) return;
+			textarea.value += btn.getAttribute("data-emoji") || "";
+			textarea.focus();
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".review-media-img"), function(btn) {
+		btn.onclick = function() {
+			var src = btn.getAttribute("data-src");
+			if (src) window.open(src, "_blank");
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".review-media-remove"), function(btn) {
+		btn.onclick = function() {
+			state.reviewDraftMedia.splice(Number(btn.getAttribute("data-index") || 0), 1);
+			renderPage();
+		};
+	});
+	var detailReviewMedia = document.getElementById("detailReviewMedia");
+	if (detailReviewMedia) {
+		detailReviewMedia.onchange = function() {
+			if (!state.selectedProduct) return;
+			var files = Array.prototype.slice.call(detailReviewMedia.files || []);
+			if (!files.length) return;
+			if ((state.reviewDraftMedia || []).length + files.length > 6) {
+				alert("单条评价最多上传 6 个图片或视频。");
+				detailReviewMedia.value = "";
+				return;
+			}
+			var chain = Promise.resolve();
+			files.forEach(function(file) {
+				chain = chain.then(function() {
+					var formData = new FormData();
+					formData.append("productId", state.selectedProduct.id);
+					formData.append("media", file);
+					return uploadFormData("reviewMediaUpload", formData).then(function(data) {
+						if (!data.success) throw new Error(data.message || "上传失败");
+						state.reviewDraftMedia.push(data);
+					});
+				});
+			});
+			chain.then(function() {
+				detailReviewMedia.value = "";
+				renderPage();
+			}).catch(function(err) {
+				detailReviewMedia.value = "";
+				alert(err.message || "上传失败");
+			});
+		};
+	}
+	var enhancedReviewForm = document.getElementById("detailReviewForm");
+	if (enhancedReviewForm) {
+		enhancedReviewForm.onsubmit = function(e) {
+			e.preventDefault();
+			if (!state.selectedProduct) return;
+			var contentEl = document.getElementById("detailReviewContent");
+			var content = contentEl ? contentEl.value.trim() : "";
+			var mediaIds = (state.reviewDraftMedia || []).map(function(item) { return item.mediaId || item.id; }).filter(Boolean);
+			if (!content && !mediaIds.length) {
+				alert("请填写评价内容或上传图片/视频。");
+				return;
+			}
+			post("reviews", {
+				action: "add",
+				productId: state.selectedProduct.id,
+				orderId: document.getElementById("detailReviewOrder").value,
+				rating: document.getElementById("detailReviewRating").value,
+				content: content,
+				anonymous: document.getElementById("detailReviewAnonymous") && document.getElementById("detailReviewAnonymous").checked ? "true" : "false",
+				mediaIds: mediaIds.join(",")
+			}).then(function(data) {
+				if (!data.success) { alert(data.message || "评价失败"); return; }
+				state.reviewDraftMedia = [];
+				state.activeReviewReplyId = null;
+				showToast("评价已发布");
+				Promise.all([loadProductReviews(state.selectedProduct.id), loadProducts(), loadOrders(), loadReviewStats()]).then(renderPage);
+			});
+		};
+	}
+	Array.prototype.forEach.call(document.querySelectorAll(".review-like"), function(btn) {
+		btn.onclick = function() {
+			if (!state.user && !state.merchant && !state.admin) {
+				alert("请先登录后操作评论。");
+				return;
+			}
+			post("reviews", { action: "like", reviewId: btn.getAttribute("data-id") }).then(function(data) {
+				if (!data.success) { alert(data.message || "点赞失败"); return; }
+				if (state.selectedProduct) loadProductReviews(state.selectedProduct.id).then(renderPage);
+			});
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".review-reply-open"), function(btn) {
+		btn.onclick = function() {
+			if (!state.user && !state.merchant && !state.admin) {
+				alert("请先登录后操作评论。");
+				return;
+			}
+			state.activeReviewReplyId = Number(btn.getAttribute("data-id") || 0);
+			renderPage();
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".review-reply-cancel"), function(btn) {
+		btn.onclick = function() {
+			state.activeReviewReplyId = null;
+			renderPage();
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".review-reply-form"), function(form) {
+		form.onsubmit = function(e) {
+			e.preventDefault();
+			var textarea = form.querySelector("textarea");
+			var content = textarea ? textarea.value.trim() : "";
+			if (!content) {
+				alert("请输入回复内容。");
+				return;
+			}
+			post("reviews", { action: "reply", reviewId: form.getAttribute("data-id"), content: content }).then(function(data) {
+				if (!data.success) { alert(data.message || "回复失败"); return; }
+				state.activeReviewReplyId = null;
+				showToast("回复已发布");
+				if (state.selectedProduct) loadProductReviews(state.selectedProduct.id).then(renderPage);
+			});
+		};
+	});
 	Array.prototype.forEach.call(document.querySelectorAll(".remove-btn"), function(btn) {
 		btn.onclick = function() {
 			post("cart", { action: "remove", cartItemId: btn.getAttribute("data-cart") }).then(function(data) {
@@ -3996,6 +4330,7 @@ function bindPageActions() {
 	var merchantProductForm = document.getElementById("merchantProductForm");
 	if (merchantProductForm) {
 		bindMerchantMediaActions();
+		bindProductAttrsEditor();
 		var mpMediaFile = document.getElementById("mpMediaFile");
 		if (mpMediaFile) {
 			mpMediaFile.onchange = function() {
@@ -4097,7 +4432,8 @@ function bindPageActions() {
 				colorOptions: (skuAttrs[0] && skuAttrs[0].values || ["默认"]).join(","),
 				specOptions: (skuAttrs[1] && skuAttrs[1].values || ["标准"]).join(","),
 				skuAttrs: JSON.stringify(skuAttrs),
-				skuOptions: JSON.stringify(skuRows)
+				skuOptions: JSON.stringify(skuRows),
+				productAttrs: JSON.stringify(readProductAttrs())
 			}).then(function(data) {
 				if (!data.success) { alert(data.message || "保存失败"); return; }
 				state.merchantProducts = data.products || [];
@@ -4193,6 +4529,10 @@ function bindPageActions() {
 			Array.prototype.forEach.call(document.querySelectorAll('.merchant-product-field[data-id="' + id + '"]'), function(input) {
 				payload[input.getAttribute("data-field")] = input.value;
 			});
+			if (!payload.productAttrs) {
+				var originalProduct = state.adminAuditProducts.filter(function(item) { return String(item.id) === String(id); })[0];
+				payload.productAttrs = JSON.stringify(productDisplayAttrs(originalProduct || {}));
+			}
 			syncAdminProductMediaPayload(payload);
 			post("admin/merchants", payload).then(function(data) {
 				if (!data.success) { alert(data.message || "保存失败"); return; }
@@ -4550,6 +4890,7 @@ function updateAuthView() {
 	document.getElementById("merchantProgressBox").classList.toggle("hidden", !isMerchant);
 	document.querySelector(".switch-text").classList.toggle("hidden", isAdmin);
 	icon.src = isAdmin ? "assets/img/admin-login-entry-icon.png?v=login-admin-icon-20260601" : (isMerchant ? "assets/img/auth-merchant-role.png?v=role-merchant-20260601" : "assets/img/hishopping-mascot.png");
+	updateCaptchaView(needsRegisterCaptcha());
 	updateAuthRoleButtons();
 	showMessage("");
 }
@@ -4576,6 +4917,9 @@ Array.prototype.forEach.call(document.querySelectorAll(".auth-role-btn"), functi
 		updateAuthView();
 	};
 });
+
+document.getElementById("captchaImage").onclick = resetCaptcha;
+document.getElementById("captchaRefresh").onclick = resetCaptcha;
 
 document.getElementById("merchantProgressBtn").onclick = function() {
 	var input = document.getElementById("merchantProgressInput");
@@ -4623,6 +4967,7 @@ document.getElementById("enterBtn").onclick = function() {
 	var password = document.getElementById("passwordInput").value.trim();
 	var username = document.getElementById("usernameInput").value.trim();
 	var phone = document.getElementById("phoneInput").value.trim();
+	var captcha = document.getElementById("captchaInput").value.trim();
 	if (!account) {
 		showMessage(state.authMode === "admin" ? "请输入管理员账号。" : (state.authType === "login" ? "请输入用户ID、邮箱或手机号。" : "请输入邮箱。"));
 		return;
@@ -4643,6 +4988,10 @@ document.getElementById("enterBtn").onclick = function() {
 		showMessage("请输入有效的中国大陆手机号。");
 		return;
 	}
+	if (needsRegisterCaptcha() && !captcha) {
+		showMessage("请输入验证码。");
+		return;
+	}
 	showMessage("正在处理...", true);
 	if (state.authMode === "merchant" && state.authType !== "login") {
 		post("merchant/register", {
@@ -4654,9 +5003,10 @@ document.getElementById("enterBtn").onclick = function() {
 			shopName: document.getElementById("merchantShopName").value.trim(),
 			shopDesc: document.getElementById("merchantDesc").value.trim(),
 			businessCategory: document.getElementById("merchantCategory").value.trim(),
-			businessAddress: document.getElementById("merchantAddress").value.trim()
+			businessAddress: document.getElementById("merchantAddress").value.trim(),
+			captcha: captcha
 		}).then(function(data) {
-			if (!data.success) { showMessage(data.message || "提交失败"); return; }
+			if (!data.success) { showMessage(data.message || "提交失败"); resetCaptcha(); return; }
 			showMerchantRegisterSuccess(data);
 			state.authType = "login";
 			setTimeout(updateAuthView, 10000);
@@ -4684,8 +5034,16 @@ document.getElementById("enterBtn").onclick = function() {
 			username: username,
 			email: account,
 			phone: phone,
-			password: password
-		}).then(afterAuth).catch(function(err) { showMessage(err.message); });
+			password: password,
+			captcha: captcha
+		}).then(function(data) {
+			if (!data.success) {
+				showMessage(data.message || "操作失败");
+				resetCaptcha();
+				return;
+			}
+			afterAuth(data);
+		}).catch(function(err) { showMessage(err.message); resetCaptcha(); });
 	}
 };
 

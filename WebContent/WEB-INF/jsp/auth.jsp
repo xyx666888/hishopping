@@ -60,6 +60,16 @@
 					<span>密码</span>
 					<input id="passwordInput" type="password" placeholder="请输入密码">
 				</label>
+				<div id="captchaField" class="captcha-field hidden">
+					<label class="field captcha-input-field">
+						<span>验证码</span>
+						<input id="captchaInput" type="text" maxlength="4" autocomplete="off" placeholder="请输入验证码">
+					</label>
+					<div class="captcha-actions">
+						<img id="captchaImage" class="captcha-image" src="" alt="验证码" title="点击刷新验证码">
+						<button id="captchaRefresh" class="captcha-refresh" type="button" title="刷新验证码" aria-label="刷新验证码">↻</button>
+					</div>
+				</div>
 				<button class="primary-btn full" id="enterBtn" type="button">登录进入</button>
 				<p id="formMessage" class="form-message"></p>
 			</form>

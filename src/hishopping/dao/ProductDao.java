@@ -12,6 +12,7 @@ import hishopping.entity.Category;
 import hishopping.entity.Product;
 import hishopping.entity.ProductMedia;
 import hishopping.util.DBUtil;
+import hishopping.util.ProductAttrUtil;
 import hishopping.util.SkuUtil;
 
 public class ProductDao {
@@ -22,6 +23,7 @@ public class ProductDao {
         MerchantDao.ensureSchema();
         BusinessDao.ensureSchema();
         ProductMediaDao.ensureSchema();
+        ensureProductAttrSchema();
     }
 
     public List<Category> findCategories() {
@@ -161,6 +163,7 @@ public class ProductDao {
     public Product saveMerchantProduct(Product p) {
         p.setMediaList(ProductMediaDao.normalize(p.getMediaList()));
         p.setImageUrl(ProductMediaDao.firstMediaUrl(p.getMediaList(), p.getImageUrl()));
+        p.setProductAttrs(ProductAttrUtil.normalizeJson(p.getProductAttrs()));
         String sql = "insert into hishopping_product(category_id,name,short_desc,detail_desc,price,old_price,rating,sales,stock,tag,image_url,gradient,icon_text,color_options,spec_options,sku_options,status,merchant_id,sale_status,audit_status,submit_time) values(?,?,?,?,?,?,5.0,0,?,N'商家',?,N'linear-gradient(135deg,#16a34a,#0f766e)',N'品',?,?,?,N'上架中',?,N'OFF_SALE',N'PENDING',sysdatetime())";
         Connection conn = null;
         PreparedStatement ps = null;
@@ -183,6 +186,7 @@ public class ProductDao {
             ps.executeUpdate();
             keys = ps.getGeneratedKeys();
             if (keys.next()) p.setId(keys.getInt(1));
+            updateProductAttrs(p.getId(), p.getMerchantId(), p.getProductAttrs());
             updateSkuPayload(p);
             mediaDao.replaceProductMedia(p.getId(), p.getMediaList());
             bindProductMediaResources(p);
@@ -197,6 +201,7 @@ public class ProductDao {
     public void updateMerchantProduct(Product p, boolean requireAudit) {
         p.setMediaList(ProductMediaDao.normalize(p.getMediaList()));
         p.setImageUrl(ProductMediaDao.firstMediaUrl(p.getMediaList(), p.getImageUrl()));
+        p.setProductAttrs(ProductAttrUtil.normalizeJson(p.getProductAttrs()));
         String auditSql = requireAudit ? ", sale_status=N'OFF_SALE', audit_status=N'PENDING', audit_opinion=NULL, submit_time=sysdatetime()" : "";
         String sql = "update hishopping_product set category_id=?, name=?, short_desc=?, detail_desc=?, price=?, old_price=?, stock=?, image_url=?, color_options=?, spec_options=?, sku_options=?" + auditSql + " where id=? and merchant_id=?";
         Connection conn = null;
@@ -218,6 +223,7 @@ public class ProductDao {
             ps.setInt(12, p.getId());
             ps.setInt(13, p.getMerchantId());
             ps.executeUpdate();
+            updateProductAttrs(p.getId(), p.getMerchantId(), p.getProductAttrs());
             updateSkuPayload(p);
             mediaDao.replaceProductMedia(p.getId(), p.getMediaList());
             bindProductMediaResources(p);
@@ -284,6 +290,7 @@ public class ProductDao {
     public void updateAdminMerchantProduct(Product p) {
         p.setMediaList(ProductMediaDao.normalize(p.getMediaList()));
         p.setImageUrl(ProductMediaDao.firstMediaUrl(p.getMediaList(), p.getImageUrl()));
+        p.setProductAttrs(ProductAttrUtil.normalizeJson(p.getProductAttrs()));
         String sql = "update hishopping_product set category_id=?, name=?, short_desc=?, detail_desc=?, price=?, old_price=?, stock=?, image_url=?, color_options=?, spec_options=?, sku_options=? where id=? and merchant_id=?";
         Connection conn = null;
         PreparedStatement ps = null;
@@ -304,6 +311,7 @@ public class ProductDao {
             ps.setInt(12, p.getId());
             ps.setInt(13, p.getMerchantId());
             ps.executeUpdate();
+            updateProductAttrs(p.getId(), p.getMerchantId(), p.getProductAttrs());
             mediaDao.replaceProductMedia(p.getId(), p.getMediaList());
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -372,6 +380,7 @@ public class ProductDao {
         p.setSpecOptions(rs.getString("spec_options"));
         p.setSkuAttrs(getString(rs, "sku_attrs"));
         p.setSkuOptions(getString(rs, "sku_options"));
+        p.setProductAttrs(ProductAttrUtil.normalizeJson(getString(rs, "product_attrs")));
         p.setStatus(rs.getString("status"));
         p.setMerchantId(getInt(rs, "merchant_id"));
         p.setMerchantCode(getString(rs, "merchant_code"));
@@ -425,6 +434,39 @@ public class ProductDao {
             businessDao.bindUploadResource(p.getMerchantId(), media.getMediaUrl(), p.getId());
         }
         businessDao.bindUploadResource(p.getMerchantId(), p.getImageUrl(), p.getId());
+    }
+
+    private void updateProductAttrs(int productId, int merchantId, String productAttrs) {
+        if (productId <= 0 || merchantId <= 0) return;
+        String sql = "update hishopping_product set product_attrs=? where id=? and merchant_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, ProductAttrUtil.normalizeJson(productAttrs));
+            ps.setInt(2, productId);
+            ps.setInt(3, merchantId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    private void ensureProductAttrSchema() {
+        Connection conn = null;
+        Statement st = null;
+        try {
+            conn = DBUtil.getConn();
+            st = conn.createStatement();
+            st.executeUpdate("IF COL_LENGTH('dbo.hishopping_product', 'product_attrs') IS NULL ALTER TABLE dbo.hishopping_product ADD product_attrs NVARCHAR(MAX) NULL");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, st, conn);
+        }
     }
 
     private String getString(ResultSet rs, String column) {

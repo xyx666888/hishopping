@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import hishopping.entity.Merchant;
 import hishopping.service.MerchantService;
+import hishopping.util.CaptchaUtil;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -22,6 +23,11 @@ public class MerchantRegisterServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         request.setCharacterEncoding("UTF-8");
         try {
+            CaptchaUtil.CaptchaResult captcha = CaptchaUtil.verify(request, request.getParameter("captcha"));
+            if (!captcha.isValid()) {
+                JsonUtil.write(response, ServletUtil.fail(captcha.getMessage()));
+                return;
+            }
             Merchant m = new Merchant();
             m.setMerchantName(request.getParameter("merchantName"));
             m.setPassword(request.getParameter("password"));
