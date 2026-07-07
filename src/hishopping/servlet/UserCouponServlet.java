@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import hishopping.entity.User;
+import hishopping.service.AccountRestrictionService;
 import hishopping.service.CouponService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
@@ -19,6 +20,7 @@ import hishopping.util.ServletUtil;
 public class UserCouponServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private CouponService service = new CouponService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         User user = ServletUtil.currentUser(request);
@@ -37,6 +39,12 @@ public class UserCouponServlet extends HttpServlet {
         User user = ServletUtil.currentUser(request);
         if (user == null) {
             JsonUtil.write(response, ServletUtil.fail("请先登录普通用户账号。"));
+            return;
+        }
+        try {
+            restrictionService.require("USER", user.getId(), "can_claim_coupon");
+        } catch (RuntimeException e) {
+            JsonUtil.write(response, ServletUtil.fail(e.getMessage()));
             return;
         }
         CouponService.IssueResult issueResult = null;

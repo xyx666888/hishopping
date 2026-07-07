@@ -16,6 +16,9 @@ public class User {
     private String punishReason;
     private String punishStartTime;
     private String punishEndTime;
+    private String cancelRequestTime;
+    private String cancelDeadlineTime;
+    private String cancelCancelTime;
     private String createTime;
 
     public int getId() { return id; }
@@ -48,6 +51,12 @@ public class User {
     public void setPunishStartTime(String punishStartTime) { this.punishStartTime = punishStartTime; }
     public String getPunishEndTime() { return punishEndTime; }
     public void setPunishEndTime(String punishEndTime) { this.punishEndTime = punishEndTime; }
+    public String getCancelRequestTime() { return cancelRequestTime; }
+    public void setCancelRequestTime(String cancelRequestTime) { this.cancelRequestTime = cancelRequestTime; }
+    public String getCancelDeadlineTime() { return cancelDeadlineTime; }
+    public void setCancelDeadlineTime(String cancelDeadlineTime) { this.cancelDeadlineTime = cancelDeadlineTime; }
+    public String getCancelCancelTime() { return cancelCancelTime; }
+    public void setCancelCancelTime(String cancelCancelTime) { this.cancelCancelTime = cancelCancelTime; }
     public String getCreateTime() { return createTime; }
     public void setCreateTime(String createTime) { this.createTime = createTime; }
 }

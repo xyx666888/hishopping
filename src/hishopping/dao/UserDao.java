@@ -15,7 +15,7 @@ import hishopping.util.DBUtil;
 public class UserDao {
     private static final String NORMAL_STATUS = "\u6b63\u5e38";
     private static final String DELETED_STATUS = "\u5df2\u5220\u9664";
-    private static final String USER_COLUMNS = "id, account_id, username, email, phone, password, role, points, vip_level, growth_value, status, avatar_url, punish_reason, punish_start_time, punish_end_time, create_time";
+    private static final String USER_COLUMNS = "id, account_id, username, email, phone, password, role, points, vip_level, growth_value, status, avatar_url, punish_reason, punish_start_time, punish_end_time, cancel_request_time, cancel_deadline_time, cancel_cancel_time, create_time";
     private static boolean accountIdChecked = false;
 
     public static int calculateVipLevel(int growthValue) {
@@ -286,6 +286,84 @@ public class UserDao {
         }
     }
 
+    public void updateOwnProfile(int userId, String username, String email, String phone, String newPassword) {
+        ensureAccountIdReady();
+        boolean changePassword = newPassword != null && newPassword.trim().length() > 0;
+        String sql = changePassword
+            ? "update hishopping_user set username=?, email=?, phone=?, password=? where id=? and role=N'user'"
+            : "update hishopping_user set username=?, email=?, phone=? where id=? and role=N'user'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, username);
+            ps.setString(2, email);
+            ps.setString(3, phone);
+            if (changePassword) {
+                ps.setString(4, newPassword.trim());
+                ps.setInt(5, userId);
+            } else {
+                ps.setInt(4, userId);
+            }
+            if (ps.executeUpdate() == 0) throw new RuntimeException("用户不存在或不允许修改。");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void requestCancel(int userId) {
+        ensureAccountIdReady();
+        String sql = "update hishopping_user set status=N'注销中', cancel_request_time=sysdatetime(), cancel_deadline_time=dateadd(day,7,sysdatetime()), cancel_cancel_time=null where id=? and role=N'user' and status=N'正常'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, userId);
+            if (ps.executeUpdate() == 0) throw new RuntimeException("当前账号状态不允许发起注销。");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void cancelPendingCancel(int userId) {
+        ensureAccountIdReady();
+        String sql = "update hishopping_user set status=N'正常', cancel_cancel_time=sysdatetime(), cancel_request_time=null, cancel_deadline_time=null where id=? and status=N'注销中'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void finishExpiredCancel(int userId) {
+        ensureAccountIdReady();
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement("update hishopping_user set status=N'已注销' where id=? and status=N'注销中'");
+            ps.setInt(1, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
     public void markDeleted(int userId) {
         ensureAccountIdReady();
         Connection conn = null;
@@ -497,6 +575,9 @@ public class UserDao {
             st.executeUpdate("if col_length('dbo.hishopping_user', 'punish_reason') is null alter table dbo.hishopping_user add punish_reason nvarchar(500) null");
             st.executeUpdate("if col_length('dbo.hishopping_user', 'punish_start_time') is null alter table dbo.hishopping_user add punish_start_time datetime2 null");
             st.executeUpdate("if col_length('dbo.hishopping_user', 'punish_end_time') is null alter table dbo.hishopping_user add punish_end_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishopping_user', 'cancel_request_time') is null alter table dbo.hishopping_user add cancel_request_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishopping_user', 'cancel_deadline_time') is null alter table dbo.hishopping_user add cancel_deadline_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishopping_user', 'cancel_cancel_time') is null alter table dbo.hishopping_user add cancel_cancel_time datetime2 null");
             st.executeUpdate("update dbo.hishopping_user set account_id = right('100000' + cast(100000 + id as varchar(8)), case when id < 900000 then 6 else 8 end) where account_id is null or ltrim(rtrim(account_id)) = ''");
             st.executeUpdate("update dbo.hishopping_user set growth_value = case when growth_value > 0 then growth_value else points end");
             st.executeUpdate("update dbo.hishopping_user set vip_level = case when growth_value >= 24000 then 10 when growth_value >= 16000 then 9 when growth_value >= 11000 then 8 when growth_value >= 7000 then 7 when growth_value >= 4000 then 6 when growth_value >= 2000 then 5 when growth_value >= 1000 then 4 when growth_value >= 500 then 3 when growth_value >= 200 then 2 else 1 end");
@@ -534,6 +615,9 @@ public class UserDao {
         user.setPunishReason(getString(rs, "punish_reason"));
         user.setPunishStartTime(time(rs, "punish_start_time"));
         user.setPunishEndTime(time(rs, "punish_end_time"));
+        user.setCancelRequestTime(time(rs, "cancel_request_time"));
+        user.setCancelDeadlineTime(time(rs, "cancel_deadline_time"));
+        user.setCancelCancelTime(time(rs, "cancel_cancel_time"));
         user.setCreateTime(String.valueOf(rs.getTimestamp("create_time")));
         return user;
     }

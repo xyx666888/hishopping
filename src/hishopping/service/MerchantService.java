@@ -2,14 +2,19 @@ package hishopping.service;
 
 import java.util.List;
 import java.util.Random;
+import java.util.regex.Pattern;
 
 import hishopping.dao.MerchantDao;
 import hishopping.dao.ReportDao;
 import hishopping.entity.Merchant;
 
 public class MerchantService {
+    private static final Pattern MAINLAND_PHONE_PATTERN = Pattern.compile("^1[3-9]\\d{9}$");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
     private MerchantDao merchantDao = new MerchantDao();
     private ReportDao reportDao = new ReportDao();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
     private Random random = new Random();
 
     public Merchant register(Merchant merchant) {
@@ -28,6 +33,15 @@ public class MerchantService {
         require(password, "请输入密码。");
         Merchant merchant = merchantDao.findByLogin(account.trim(), password.trim());
         if (merchant == null) throw new RuntimeException("商家账号或密码错误。");
+        if ("CANCEL_PENDING".equals(merchant.getStatus())) {
+            if (expired(merchant.getCancelDeadlineTime())) {
+                merchantDao.finishExpiredCancel(merchant.getMerchantId());
+                throw new RuntimeException("商家账号已注销，无法登录。");
+            }
+            merchantDao.cancelPendingCancel(merchant.getMerchantId());
+            return merchantDao.findById(merchant.getMerchantId());
+        }
+        if ("CANCELLED".equals(merchant.getStatus())) throw new RuntimeException("商家账号已注销，无法登录。");
         if (isTemporaryBlocked(merchant.getStatus()) && expired(merchant.getPunishEndTime())) {
             merchantDao.restorePunishmentIfExpired(merchant.getMerchantId());
             reportDao.expirePunishments("MERCHANT", merchant.getMerchantId());
@@ -38,6 +52,7 @@ public class MerchantService {
         if ("FROZEN".equals(merchant.getStatus())) throw new RuntimeException("商家账号已被冻结，预计恢复时间：" + safeTime(merchant.getPunishEndTime()) + "。冻结原因：" + safeReason(merchant.getPunishReason()));
         if ("DISABLED".equals(merchant.getStatus())) throw new RuntimeException("商家账号已被停用，预计恢复时间：" + safeTime(merchant.getPunishEndTime()) + "。停用原因：" + safeReason(merchant.getPunishReason()));
         if ("BANNED".equals(merchant.getStatus())) throw new RuntimeException("商家账号已被封禁。封禁原因：" + safeReason(merchant.getPunishReason()));
+        restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_login");
         return merchant;
     }
 
@@ -67,12 +82,38 @@ public class MerchantService {
     }
 
     public void updateProfile(Merchant merchant) {
+        updateProfile(merchant, true);
+    }
+
+    public void updateProfile(Merchant merchant, boolean checkRestriction) {
         if (merchant.getMerchantId() <= 0) throw new RuntimeException("\u8bf7\u9009\u62e9\u5546\u5bb6\u3002");
+        Merchant current = merchantDao.findById(merchant.getMerchantId());
+        if (current == null) throw new RuntimeException("商家不存在。");
+        if (checkRestriction) restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_edit_profile");
+        if (blank(merchant.getPassword())) merchant.setPassword(current.getPassword());
+        if (blank(merchant.getContactName())) merchant.setContactName(current.getContactName());
+        if (blank(merchant.getShopDesc())) merchant.setShopDesc(current.getShopDesc());
         require(merchant.getMerchantName(), "\u8bf7\u8f93\u5165\u5546\u5bb6\u540d\u79f0\u3002");
         require(merchant.getPassword(), "\u8bf7\u8f93\u5165\u767b\u5f55\u5bc6\u7801\u3002");
+        require(merchant.getContactName(), "请输入联系人姓名。");
         require(merchant.getContactPhone(), "\u8bf7\u8f93\u5165\u7ed1\u5b9a\u624b\u673a\u53f7\u3002");
         require(merchant.getShopName(), "\u8bf7\u8f93\u5165\u5e97\u94fa\u540d\u79f0\u3002");
+        if (!validMainlandPhone(merchant.getContactPhone().trim())) throw new RuntimeException("请输入有效的中国大陆手机号。");
+        if (!blank(merchant.getEmail()) && !validEmail(merchant.getEmail().trim())) throw new RuntimeException("请输入正确的邮箱格式。");
         merchantDao.updateProfile(merchant);
+    }
+
+    public Merchant updateAvatar(int merchantId, String avatarUrl) {
+        if (merchantId <= 0 || avatarUrl == null || avatarUrl.trim().length() == 0) throw new RuntimeException("头像地址无效。");
+        restrictionService.require("MERCHANT", merchantId, "can_edit_avatar");
+        merchantDao.updateAvatar(merchantId, avatarUrl.trim());
+        return merchantDao.findById(merchantId);
+    }
+
+    public void requestCancel(int merchantId) {
+        if (merchantId <= 0) throw new RuntimeException("商家编号不正确。");
+        restrictionService.require("MERCHANT", merchantId, "can_cancel_account");
+        merchantDao.requestCancel(merchantId);
     }
 
     private String generateCode() {
@@ -88,6 +129,18 @@ public class MerchantService {
 
     private void require(String value, String message) {
         if (value == null || value.trim().length() == 0) throw new RuntimeException(message);
+    }
+
+    private boolean blank(String value) {
+        return value == null || value.trim().length() == 0;
+    }
+
+    private boolean validEmail(String email) {
+        return email != null && EMAIL_PATTERN.matcher(email).matches();
+    }
+
+    private boolean validMainlandPhone(String phone) {
+        return phone != null && MAINLAND_PHONE_PATTERN.matcher(phone).matches();
     }
 
     private boolean isTemporaryBlocked(String status) {

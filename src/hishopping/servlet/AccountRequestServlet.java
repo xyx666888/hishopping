@@ -15,6 +15,8 @@ import hishopping.dao.UserDao;
 import hishopping.entity.Admin;
 import hishopping.entity.Merchant;
 import hishopping.entity.User;
+import hishopping.service.MerchantService;
+import hishopping.service.UserService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -24,6 +26,8 @@ public class AccountRequestServlet extends HttpServlet {
     private MessageDao messageDao = new MessageDao();
     private MerchantDao merchantDao = new MerchantDao();
     private UserDao userDao = new UserDao();
+    private UserService userService = new UserService();
+    private MerchantService merchantService = new MerchantService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         boolean adminPath = request.getRequestURI().indexOf("/admin/") >= 0;
@@ -73,6 +77,51 @@ public class AccountRequestServlet extends HttpServlet {
         Identity identity = identity(request);
         if (identity == null) {
             JsonUtil.write(response, ServletUtil.fail("请先登录后提交申请。"));
+            return;
+        }
+        String action = text(request.getParameter("action"));
+        try {
+            if ("profile".equals(action)) {
+                Map<String, Object> result = ServletUtil.ok();
+                if ("USER".equals(identity.role)) {
+                    User updated = userService.updateOwnProfile(identity.id, request.getParameter("username"), request.getParameter("email"), request.getParameter("phone"), request.getParameter("oldPassword"), request.getParameter("password"));
+                    request.getSession().setAttribute("user", updated);
+                    result.put("user", ServletUtil.user(updated));
+                } else {
+                    Merchant current = merchantService.findById(identity.id);
+                    Merchant merchant = new Merchant();
+                    merchant.setMerchantId(identity.id);
+                    merchant.setMerchantName(text(request.getParameter("merchantName")));
+                    merchant.setPassword(text(request.getParameter("password")).length() == 0 && current != null ? current.getPassword() : text(request.getParameter("password")));
+                    merchant.setContactName(text(request.getParameter("contactName")));
+                    merchant.setContactPhone(text(request.getParameter("contactPhone")));
+                    merchant.setEmail(text(request.getParameter("email")));
+                    merchant.setShopName(text(request.getParameter("shopName")));
+                    merchant.setShopDesc(text(request.getParameter("shopDesc")));
+                    merchant.setBusinessCategory(text(request.getParameter("businessCategory")));
+                    merchant.setBusinessAddress(text(request.getParameter("businessAddress")));
+                    merchantService.updateProfile(merchant);
+                    Merchant updated = merchantService.findById(identity.id);
+                    request.getSession().setAttribute("merchant", updated);
+                    result.put("merchant", ServletUtil.merchant(updated));
+                }
+                JsonUtil.write(response, result);
+                return;
+            }
+            if ("cancel".equals(action)) {
+                if ("USER".equals(identity.role)) {
+                    userService.requestCancel(identity.id);
+                    messageDao.send("SYSTEM", 0, "系统通知", "USER", identity.id, identity.name, "账号注销已进入冷静期", "你的账号已进入 7 天注销冷静期，7 天内重新登录会自动取消注销。", "NONE", "");
+                } else {
+                    merchantService.requestCancel(identity.id);
+                    messageDao.send("SYSTEM", 0, "系统通知", "MERCHANT", identity.id, identity.name, "商家账号注销已进入冷静期", "你的商家账号已进入 7 天注销冷静期，7 天内重新登录会自动取消注销。", "NONE", "");
+                }
+                request.getSession().invalidate();
+                JsonUtil.write(response, ServletUtil.ok());
+                return;
+            }
+        } catch (RuntimeException e) {
+            JsonUtil.write(response, ServletUtil.fail(e.getMessage()));
             return;
         }
         String type = normalizeType(request.getParameter("requestType"));

@@ -16,6 +16,7 @@ public class ReportService {
     private ProductDao productDao = new ProductDao();
     private BusinessService businessService = new BusinessService();
     private BusinessDao businessDao = new BusinessDao();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     public int create(Report report) {
         if (!validReporterRole(report.getReporterRole()) || report.getReporterId() <= 0) throw new RuntimeException("请先登录后再提交举报。");
@@ -136,7 +137,32 @@ public class ReportService {
             if (ids[1] > 0) sendSystem("USER", ids[1], "评价处理通知", "你的商品评价已被平台隐藏。原因：" + reason, "REPORT", String.valueOf(report.getReportId()));
             return "已隐藏评价 #" + targetId + "。";
         }
+        if (actionType.indexOf("LIMIT_USER_") == 0 || actionType.indexOf("LIMIT_MERCHANT_") == 0) {
+            String expectedRole = actionType.indexOf("LIMIT_USER_") == 0 ? "USER" : "MERCHANT";
+            requireTarget(targetRole, targetId, expectedRole);
+            Integer days = normalizeDays(durationDays);
+            String permissionKey = permissionFromAction(actionType);
+            restrictionService.restrict(expectedRole, targetId, permissionKey, reason, "REPORT", report.getReportId(), days, adminId, adminName);
+            dao.createPunishment(report.getReportId(), expectedRole, targetId, actionType, days, reason, adminId, adminName);
+            sendSystem(expectedRole, targetId, "账号权限限制通知", "平台已限制你的权限：" + permissionKey + "，期限 " + days + " 天。原因：" + reason, "REPORT", String.valueOf(report.getReportId()));
+            return "已限制" + expectedRole + "#" + targetId + " 权限 " + permissionKey + " " + days + " 天。";
+        }
         throw new RuntimeException("处理动作不正确。");
+    }
+
+    private String permissionFromAction(String actionType) {
+        if ("LIMIT_USER_ORDER".equals(actionType)) return "can_order";
+        if ("LIMIT_USER_PAY".equals(actionType)) return "can_pay";
+        if ("LIMIT_USER_REVIEW".equals(actionType)) return "can_review";
+        if ("LIMIT_USER_MESSAGE".equals(actionType)) return "can_message";
+        if ("LIMIT_USER_REPORT".equals(actionType)) return "can_report";
+        if ("LIMIT_MERCHANT_ADD_PRODUCT".equals(actionType)) return "can_add_product";
+        if ("LIMIT_MERCHANT_EDIT_PRODUCT".equals(actionType)) return "can_edit_product";
+        if ("LIMIT_MERCHANT_ON_SALE_PRODUCT".equals(actionType)) return "can_on_sale_product";
+        if ("LIMIT_MERCHANT_MANAGE_ORDER".equals(actionType)) return "can_manage_order";
+        if ("LIMIT_MERCHANT_SHIP_ORDER".equals(actionType)) return "can_ship_order";
+        if ("LIMIT_MERCHANT_MESSAGE".equals(actionType)) return "can_message";
+        throw new RuntimeException("限制权限动作不正确。");
     }
 
     private void requireTarget(String actualRole, int actualId, String expectedRole) {

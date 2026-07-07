@@ -11,6 +11,7 @@ import javax.servlet.http.HttpSession;
 import hishopping.entity.Address;
 import hishopping.entity.Admin;
 import hishopping.entity.AdminOperationLog;
+import hishopping.entity.AccountRestriction;
 import hishopping.entity.CartItem;
 import hishopping.entity.Category;
 import hishopping.entity.CouponIssueLog;
@@ -31,8 +32,11 @@ import hishopping.entity.ReviewReply;
 import hishopping.entity.Shipment;
 import hishopping.entity.User;
 import hishopping.entity.UserCoupon;
+import hishopping.service.AccountRestrictionService;
 
 public class ServletUtil {
+    private static AccountRestrictionService restrictionService = new AccountRestrictionService();
+
     private ServletUtil() {
     }
 
@@ -99,6 +103,11 @@ public class ServletUtil {
         map.put("punishReason", user.getPunishReason());
         map.put("punishStartTime", user.getPunishStartTime());
         map.put("punishEndTime", user.getPunishEndTime());
+        map.put("cancelRequestTime", user.getCancelRequestTime());
+        map.put("cancelDeadlineTime", user.getCancelDeadlineTime());
+        map.put("cancelCancelTime", user.getCancelCancelTime());
+        map.put("restrictions", restrictions(restrictionService.active("USER", user.getId())));
+        map.put("restrictionHistory", restrictions(restrictionService.history("USER", user.getId())));
         map.put("createTime", user.getCreateTime());
         return map;
     }
@@ -363,6 +372,11 @@ public class ServletUtil {
         map.put("punishReason", m.getPunishReason());
         map.put("punishStartTime", m.getPunishStartTime());
         map.put("punishEndTime", m.getPunishEndTime());
+        map.put("cancelRequestTime", m.getCancelRequestTime());
+        map.put("cancelDeadlineTime", m.getCancelDeadlineTime());
+        map.put("cancelCancelTime", m.getCancelCancelTime());
+        map.put("restrictions", restrictions(restrictionService.active("MERCHANT", m.getMerchantId())));
+        map.put("restrictionHistory", restrictions(restrictionService.history("MERCHANT", m.getMerchantId())));
         map.put("createTime", m.getCreateTime());
         map.put("reviewTime", m.getReviewTime());
         map.put("reviewAdminId", m.getReviewAdminId());
@@ -372,6 +386,34 @@ public class ServletUtil {
     public static List<Map<String, Object>> merchants(List<Merchant> merchants) {
         List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
         for (Merchant m : merchants) list.add(merchant(m));
+        return list;
+    }
+
+    public static Map<String, Object> restriction(AccountRestriction r) {
+        Map<String, Object> map = new LinkedHashMap<String, Object>();
+        if (r == null) return map;
+        map.put("restrictionId", r.getRestrictionId());
+        map.put("targetRole", r.getTargetRole());
+        map.put("targetId", r.getTargetId());
+        map.put("permissionKey", r.getPermissionKey());
+        map.put("restricted", r.isRestricted());
+        map.put("reason", r.getReason());
+        map.put("sourceType", r.getSourceType());
+        map.put("sourceId", r.getSourceId());
+        map.put("startTime", r.getStartTime());
+        map.put("endTime", r.getEndTime());
+        map.put("status", r.getStatus());
+        map.put("adminId", r.getAdminId());
+        map.put("adminName", r.getAdminName());
+        map.put("createTime", r.getCreateTime());
+        map.put("updateTime", r.getUpdateTime());
+        return map;
+    }
+
+    public static List<Map<String, Object>> restrictions(List<AccountRestriction> rows) {
+        List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
+        if (rows == null) return list;
+        for (AccountRestriction row : rows) list.add(restriction(row));
         return list;
     }
 

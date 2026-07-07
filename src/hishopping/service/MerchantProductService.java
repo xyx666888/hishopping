@@ -8,26 +8,35 @@ import hishopping.util.SkuUtil;
 
 public class MerchantProductService {
     private ProductDao productDao = new ProductDao();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     public List<Product> products(int merchantId) {
         return productDao.findByMerchantId(merchantId);
     }
 
     public Product add(Product p) {
+        restrictionService.require("MERCHANT", p.getMerchantId(), "can_add_product");
         validate(p);
         return productDao.saveMerchantProduct(p);
     }
 
     public void update(Product p, boolean requireAudit) {
+        restrictionService.require("MERCHANT", p.getMerchantId(), "can_edit_product");
         validate(p);
-        productDao.updateMerchantProduct(p, requireAudit);
+        productDao.updateMerchantProduct(p, false);
     }
 
     public void submitAudit(int productId, int merchantId) {
-        productDao.submitAudit(productId, merchantId);
+        onSale(productId, merchantId);
+    }
+
+    public void onSale(int productId, int merchantId) {
+        restrictionService.require("MERCHANT", merchantId, "can_on_sale_product");
+        productDao.onSale(productId, merchantId);
     }
 
     public void offSale(int productId, int merchantId) {
+        restrictionService.require("MERCHANT", merchantId, "can_off_sale_product");
         productDao.offSale(productId, merchantId);
     }
 

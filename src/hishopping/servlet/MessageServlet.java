@@ -23,6 +23,7 @@ import hishopping.entity.Product;
 import hishopping.entity.User;
 import hishopping.service.MerchantService;
 import hishopping.service.UserService;
+import hishopping.service.AccountRestrictionService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -36,6 +37,7 @@ public class MessageServlet extends HttpServlet {
     private ProductDao productDao = new ProductDao();
     private UserService userService = new UserService();
     private MerchantService merchantService = new MerchantService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Identity identity = identity(request);
@@ -73,6 +75,13 @@ public class MessageServlet extends HttpServlet {
         }
         if (!identity.canSend()) {
             JsonUtil.write(response, ServletUtil.fail("当前账号状态不可发送消息。"));
+            return;
+        }
+        try {
+            if ("USER".equals(identity.role)) restrictionService.require("USER", identity.id, "can_message");
+            if ("MERCHANT".equals(identity.role)) restrictionService.require("MERCHANT", identity.id, "can_message");
+        } catch (RuntimeException e) {
+            JsonUtil.write(response, ServletUtil.fail(e.getMessage()));
             return;
         }
         String action = trim(request.getParameter("action"));

@@ -238,7 +238,7 @@ public class MerchantDao {
     }
 
     public void updateProfile(Merchant merchant) {
-        String sql = "update hishop_merchant set merchant_name=?, password=?, register_password_demo=?, contact_phone=?, email=?, shop_name=?, shop_desc=?, business_category=?, business_address=?, update_time=sysdatetime() where merchant_id=?";
+        String sql = "update hishop_merchant set merchant_name=?, password=?, register_password_demo=?, contact_name=?, contact_phone=?, email=?, shop_name=?, shop_desc=?, business_category=?, business_address=?, update_time=sysdatetime() where merchant_id=?";
         Connection conn = null;
         PreparedStatement ps = null;
         try {
@@ -247,13 +247,14 @@ public class MerchantDao {
             ps.setString(1, merchant.getMerchantName());
             ps.setString(2, merchant.getPassword());
             ps.setString(3, merchant.getPassword());
-            ps.setString(4, merchant.getContactPhone());
-            ps.setString(5, merchant.getEmail());
-            ps.setString(6, merchant.getShopName());
-            ps.setString(7, merchant.getShopDesc());
-            ps.setString(8, merchant.getBusinessCategory());
-            ps.setString(9, merchant.getBusinessAddress());
-            ps.setInt(10, merchant.getMerchantId());
+            ps.setString(4, merchant.getContactName());
+            ps.setString(5, merchant.getContactPhone());
+            ps.setString(6, merchant.getEmail());
+            ps.setString(7, merchant.getShopName());
+            ps.setString(8, merchant.getShopDesc());
+            ps.setString(9, merchant.getBusinessCategory());
+            ps.setString(10, merchant.getBusinessAddress());
+            ps.setInt(11, merchant.getMerchantId());
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException(e);
@@ -292,6 +293,63 @@ public class MerchantDao {
         }
     }
 
+    public void requestCancel(int merchantId) {
+        String sql = "update hishop_merchant set status=N'CANCEL_PENDING', cancel_request_time=sysdatetime(), cancel_deadline_time=dateadd(day,7,sysdatetime()), cancel_cancel_time=null, update_time=sysdatetime() where merchant_id=? and status=N'APPROVED'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, merchantId);
+            if (ps.executeUpdate() == 0) throw new RuntimeException("当前商家状态不允许发起注销。");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void cancelPendingCancel(int merchantId) {
+        String sql = "update hishop_merchant set status=N'APPROVED', cancel_cancel_time=sysdatetime(), cancel_request_time=null, cancel_deadline_time=null, update_time=sysdatetime() where merchant_id=? and status=N'CANCEL_PENDING'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, merchantId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void finishExpiredCancel(int merchantId) {
+        Connection conn = null;
+        PreparedStatement ps = null;
+        PreparedStatement productPs = null;
+        try {
+            conn = DBUtil.getConn();
+            conn.setAutoCommit(false);
+            ps = conn.prepareStatement("update hishop_merchant set status=N'CANCELLED', update_time=sysdatetime() where merchant_id=? and status=N'CANCEL_PENDING'");
+            ps.setInt(1, merchantId);
+            ps.executeUpdate();
+            productPs = conn.prepareStatement("update hishopping_product set sale_status=N'OFF_SALE' where merchant_id=?");
+            productPs.setInt(1, merchantId);
+            productPs.executeUpdate();
+            conn.commit();
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ignored) {}
+            }
+            throw new RuntimeException(e);
+        } finally {
+            try { if (productPs != null) productPs.close(); } catch (SQLException ignored) {}
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
     public static synchronized void ensureSchema() {
         if (schemaReady) return;
         Connection conn = null;
@@ -312,6 +370,9 @@ public class MerchantDao {
             st.executeUpdate("if col_length('dbo.hishop_merchant','punish_reason') is null alter table dbo.hishop_merchant add punish_reason nvarchar(500) null");
             st.executeUpdate("if col_length('dbo.hishop_merchant','punish_start_time') is null alter table dbo.hishop_merchant add punish_start_time datetime2 null");
             st.executeUpdate("if col_length('dbo.hishop_merchant','punish_end_time') is null alter table dbo.hishop_merchant add punish_end_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishop_merchant','cancel_request_time') is null alter table dbo.hishop_merchant add cancel_request_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishop_merchant','cancel_deadline_time') is null alter table dbo.hishop_merchant add cancel_deadline_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishop_merchant','cancel_cancel_time') is null alter table dbo.hishop_merchant add cancel_cancel_time datetime2 null");
             st.executeUpdate("if col_length('dbo.hishopping_product','sku_options') is null alter table dbo.hishopping_product add sku_options nvarchar(max) null");
             st.executeUpdate("if col_length('dbo.hishopping_product','sku_attrs') is null alter table dbo.hishopping_product add sku_attrs nvarchar(max) null");
             st.executeUpdate("if col_length('dbo.hishopping_cart_item','selected_color') is null alter table dbo.hishopping_cart_item add selected_color nvarchar(50) null");
@@ -370,6 +431,9 @@ public class MerchantDao {
         m.setPunishReason(getString(rs, "punish_reason"));
         m.setPunishStartTime(time(rs, "punish_start_time"));
         m.setPunishEndTime(time(rs, "punish_end_time"));
+        m.setCancelRequestTime(time(rs, "cancel_request_time"));
+        m.setCancelDeadlineTime(time(rs, "cancel_deadline_time"));
+        m.setCancelCancelTime(time(rs, "cancel_cancel_time"));
         m.setCreateTime(String.valueOf(rs.getTimestamp("create_time")));
         m.setUpdateTime(String.valueOf(rs.getTimestamp("update_time")));
         m.setReviewTime(rs.getTimestamp("review_time") == null ? "" : String.valueOf(rs.getTimestamp("review_time")));

@@ -56,7 +56,7 @@ public class MerchantProductServlet extends HttpServlet {
             String action = request.getParameter("action");
             int productId = ServletUtil.intParam(request, "productId", 0);
             if ("submit".equals(action)) {
-                service.submitAudit(productId, merchant.getMerchantId());
+                service.onSale(productId, merchant.getMerchantId());
             } else if ("offSale".equals(action)) {
                 service.offSale(productId, merchant.getMerchantId());
             } else {

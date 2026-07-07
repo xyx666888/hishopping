@@ -14,6 +14,7 @@ import hishopping.entity.Admin;
 import hishopping.entity.Merchant;
 import hishopping.entity.ProductReview;
 import hishopping.entity.User;
+import hishopping.service.AccountRestrictionService;
 import hishopping.service.BusinessService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
@@ -21,6 +22,7 @@ import hishopping.util.ServletUtil;
 public class ReviewServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private BusinessService businessService = new BusinessService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String action = request.getParameter("action");
@@ -68,6 +70,7 @@ public class ReviewServlet extends HttpServlet {
                     JsonUtil.write(response, ServletUtil.fail("请填写评论内容。"));
                     return;
                 }
+                restrictionService.require("USER", user.getId(), "can_review");
                 int newReviewId = businessService.review(
                     ServletUtil.intParam(request, "orderId", 0),
                     ServletUtil.intParam(request, "productId", 0),
@@ -90,11 +93,13 @@ public class ReviewServlet extends HttpServlet {
             int reviewId = ServletUtil.intParam(request, "reviewId", 0);
             if ("like".equals(action)) {
                 Map<String, Object> ok = ServletUtil.ok();
+                if ("USER".equals(actor.type)) restrictionService.require("USER", actor.id, "can_like");
                 ok.putAll(businessService.toggleReviewLike(reviewId, actor.type, actor.id));
                 JsonUtil.write(response, ok);
                 return;
             }
             if ("reply".equals(action)) {
+                if ("USER".equals(actor.type)) restrictionService.require("USER", actor.id, "can_reply");
                 businessService.replyReview(reviewId, actor.type, actor.id, actor.name, actor.avatar, request.getParameter("content"));
                 Map<String, Object> ok = ServletUtil.ok();
                 ok.put("replies", ServletUtil.reviewReplies(businessService.reviewReplies(reviewId)));

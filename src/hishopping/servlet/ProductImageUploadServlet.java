@@ -18,6 +18,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
 
 import hishopping.entity.Merchant;
+import hishopping.service.AccountRestrictionService;
 import hishopping.service.BusinessService;
 import hishopping.service.MerchantService;
 import hishopping.util.JsonUtil;
@@ -30,6 +31,7 @@ public class ProductImageUploadServlet extends HttpServlet {
     private static final long MAX_IMAGE_SIZE = 8L * 1024 * 1024;
     private static final long MAX_VIDEO_SIZE = 80L * 1024 * 1024;
     private static final int MAX_IMAGE_SIDE = 1200;
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
     private BusinessService businessService = new BusinessService();
     private MerchantService merchantService = new MerchantService();
 
@@ -46,6 +48,12 @@ public class ProductImageUploadServlet extends HttpServlet {
         }
         request.getSession().setAttribute("merchant", refreshed);
         merchant = refreshed;
+        try {
+            restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_upload_product_media");
+        } catch (RuntimeException e) {
+            JsonUtil.write(response, ServletUtil.fail(e.getMessage()));
+            return;
+        }
 
         Part part = mediaPart(request);
         if (part == null || part.getSize() == 0) {

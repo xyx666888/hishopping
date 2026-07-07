@@ -11,6 +11,7 @@ import javax.servlet.http.HttpServletResponse;
 import hishopping.entity.Merchant;
 import hishopping.entity.Report;
 import hishopping.entity.User;
+import hishopping.service.AccountRestrictionService;
 import hishopping.service.ReportService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
@@ -18,6 +19,7 @@ import hishopping.util.ServletUtil;
 public class ReportServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private ReportService service = new ReportService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Actor actor = actor(request);
@@ -42,6 +44,7 @@ public class ReportServlet extends HttpServlet {
             return;
         }
         try {
+            if ("USER".equals(actor.role)) restrictionService.require("USER", actor.id, "can_report");
             Report report = new Report();
             report.setReporterRole(actor.role);
             report.setReporterId(actor.id);

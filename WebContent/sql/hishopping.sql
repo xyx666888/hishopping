@@ -429,6 +429,50 @@ IF COL_LENGTH('dbo.hishopping_user', 'punish_end_time') IS NULL
     ALTER TABLE dbo.hishopping_user ADD punish_end_time DATETIME2 NULL;
 IF COL_LENGTH('dbo.hishop_merchant', 'avatar_url') IS NULL
     ALTER TABLE dbo.hishop_merchant ADD avatar_url NVARCHAR(300) NULL;
+
+IF COL_LENGTH('dbo.hishopping_user', 'cancel_request_time') IS NULL
+    ALTER TABLE dbo.hishopping_user ADD cancel_request_time DATETIME2 NULL;
+IF COL_LENGTH('dbo.hishopping_user', 'cancel_deadline_time') IS NULL
+    ALTER TABLE dbo.hishopping_user ADD cancel_deadline_time DATETIME2 NULL;
+IF COL_LENGTH('dbo.hishopping_user', 'cancel_cancel_time') IS NULL
+    ALTER TABLE dbo.hishopping_user ADD cancel_cancel_time DATETIME2 NULL;
+
+IF COL_LENGTH('dbo.hishop_merchant', 'cancel_request_time') IS NULL
+    ALTER TABLE dbo.hishop_merchant ADD cancel_request_time DATETIME2 NULL;
+IF COL_LENGTH('dbo.hishop_merchant', 'cancel_deadline_time') IS NULL
+    ALTER TABLE dbo.hishop_merchant ADD cancel_deadline_time DATETIME2 NULL;
+IF COL_LENGTH('dbo.hishop_merchant', 'cancel_cancel_time') IS NULL
+    ALTER TABLE dbo.hishop_merchant ADD cancel_cancel_time DATETIME2 NULL;
+
+IF OBJECT_ID(N'dbo.hishop_account_restriction', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.hishop_account_restriction (
+        restriction_id INT IDENTITY(1,1) PRIMARY KEY,
+        target_role NVARCHAR(20) NOT NULL,
+        target_id INT NOT NULL,
+        permission_key NVARCHAR(50) NOT NULL,
+        restricted BIT NOT NULL CONSTRAINT DF_hishop_account_restriction_restricted DEFAULT 1,
+        reason NVARCHAR(500) NULL,
+        source_type NVARCHAR(30) NULL,
+        source_id INT NULL,
+        start_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_account_restriction_start DEFAULT SYSDATETIME(),
+        end_time DATETIME2 NULL,
+        status NVARCHAR(20) NOT NULL CONSTRAINT DF_hishop_account_restriction_status DEFAULT N'ACTIVE',
+        admin_id INT NULL,
+        admin_name NVARCHAR(100) NULL,
+        create_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_account_restriction_create DEFAULT SYSDATETIME(),
+        update_time DATETIME2 NULL
+    );
+END;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_account_restriction_target' AND object_id = OBJECT_ID(N'dbo.hishop_account_restriction'))
+    EXEC(N'CREATE INDEX IX_hishop_account_restriction_target ON dbo.hishop_account_restriction(target_role, target_id, status);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_account_restriction_permission' AND object_id = OBJECT_ID(N'dbo.hishop_account_restriction'))
+    EXEC(N'CREATE INDEX IX_hishop_account_restriction_permission ON dbo.hishop_account_restriction(permission_key, status);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_account_restriction_end' AND object_id = OBJECT_ID(N'dbo.hishop_account_restriction'))
+    EXEC(N'CREATE INDEX IX_hishop_account_restriction_end ON dbo.hishop_account_restriction(end_time);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_account_restriction_source' AND object_id = OBJECT_ID(N'dbo.hishop_account_restriction'))
+    EXEC(N'CREATE INDEX IX_hishop_account_restriction_source ON dbo.hishop_account_restriction(source_type, source_id);');
 IF COL_LENGTH('dbo.hishop_merchant', 'punish_reason') IS NULL
     ALTER TABLE dbo.hishop_merchant ADD punish_reason NVARCHAR(500) NULL;
 IF COL_LENGTH('dbo.hishop_merchant', 'punish_start_time') IS NULL

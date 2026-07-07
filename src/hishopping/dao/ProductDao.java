@@ -164,7 +164,7 @@ public class ProductDao {
         p.setMediaList(ProductMediaDao.normalize(p.getMediaList()));
         p.setImageUrl(ProductMediaDao.firstMediaUrl(p.getMediaList(), p.getImageUrl()));
         p.setProductAttrs(ProductAttrUtil.normalizeJson(p.getProductAttrs()));
-        String sql = "insert into hishopping_product(category_id,name,short_desc,detail_desc,price,old_price,rating,sales,stock,tag,image_url,gradient,icon_text,color_options,spec_options,sku_options,status,merchant_id,sale_status,audit_status,submit_time) values(?,?,?,?,?,?,5.0,0,?,N'商家',?,N'linear-gradient(135deg,#16a34a,#0f766e)',N'品',?,?,?,N'上架中',?,N'OFF_SALE',N'PENDING',sysdatetime())";
+        String sql = "insert into hishopping_product(category_id,name,short_desc,detail_desc,price,old_price,rating,sales,stock,tag,image_url,gradient,icon_text,color_options,spec_options,sku_options,status,merchant_id,sale_status,audit_status,submit_time) values(?,?,?,?,?,?,5.0,0,?,N'商家',?,N'linear-gradient(135deg,#16a34a,#0f766e)',N'品',?,?,?,N'上架中',?,N'ON_SALE',N'APPROVED',sysdatetime())";
         Connection conn = null;
         PreparedStatement ps = null;
         ResultSet keys = null;
@@ -236,6 +236,10 @@ public class ProductDao {
 
     public void submitAudit(int productId, int merchantId) {
         updateMerchantSale(productId, merchantId, "OFF_SALE", "PENDING", null);
+    }
+
+    public void onSale(int productId, int merchantId) {
+        updateMerchantSale(productId, merchantId, "ON_SALE", "APPROVED", null);
     }
 
     public void offSale(int productId, int merchantId) {

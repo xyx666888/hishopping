@@ -17,6 +17,7 @@ public class UserService {
 
     private UserDao userDao = new UserDao();
     private ReportDao reportDao = new ReportDao();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
     private Random random = new Random();
     private CouponService couponService = new CouponService();
 
@@ -26,11 +27,23 @@ public class UserService {
         }
         User user = userDao.findAnyByLoginAndPassword(account.trim(), password.trim());
         if (user == null) return null;
+        if ("注销中".equals(user.getStatus())) {
+            if (expired(user.getCancelDeadlineTime())) {
+                userDao.finishExpiredCancel(user.getId());
+                throw new RuntimeException("账号已注销，无法登录。");
+            }
+            userDao.cancelPendingCancel(user.getId());
+            return userDao.findById(user.getId());
+        }
+        if ("已注销".equals(user.getStatus())) {
+            throw new RuntimeException("账号已注销，无法登录。");
+        }
         if (isTemporaryBlocked(user.getStatus()) && expired(user.getPunishEndTime())) {
             userDao.restorePunishmentIfExpired(user.getId());
             reportDao.expirePunishments("USER", user.getId());
             return userDao.findById(user.getId());
         }
+        restrictionService.require("USER", user.getId(), "can_login");
         if ("冻结".equals(user.getStatus())) {
             throw new RuntimeException("账号已被冻结，预计恢复时间：" + safeTime(user.getPunishEndTime()) + "。冻结原因：" + safeReason(user.getPunishReason()));
         }
@@ -123,6 +136,42 @@ public class UserService {
         user.setVipLevel(UserDao.calculateVipLevel(Math.max(0, growthValue)));
         user.setStatus(empty(status) ? "\u6b63\u5e38" : status.trim());
         userDao.updateUser(user, newPassword);
+    }
+
+    public User updateOwnProfile(int id, String username, String email, String phone, String oldPassword, String newPassword) {
+        if (id <= 0 || empty(username) || empty(email) || empty(phone)) {
+            throw new RuntimeException("用户名、邮箱和手机号不能为空。");
+        }
+        restrictionService.require("USER", id, "can_edit_profile");
+        String cleanEmail = email.trim();
+        String cleanPhone = phone.trim();
+        if (!validEmail(cleanEmail)) throw new RuntimeException("请输入正确的邮箱格式。");
+        if (!validMainlandPhone(cleanPhone)) throw new RuntimeException("请输入有效的中国大陆手机号。");
+        if (userDao.existsEmailExceptUser(cleanEmail, id)) throw new RuntimeException("该邮箱已被其他账号绑定。");
+        if (userDao.existsPhoneExceptUser(cleanPhone, id)) throw new RuntimeException("该手机号已被其他账号绑定。");
+        User existing = userDao.findById(id);
+        if (existing == null || DELETED_STATUS.equals(existing.getStatus())) throw new RuntimeException("用户不存在。");
+        String password = null;
+        if (!empty(newPassword)) {
+            if (newPassword.trim().length() < 6) throw new RuntimeException("新密码至少需要6位。");
+            if (empty(oldPassword) || !existing.getPassword().equals(oldPassword.trim())) throw new RuntimeException("旧密码不正确。");
+            password = newPassword.trim();
+        }
+        userDao.updateOwnProfile(id, username.trim(), cleanEmail, cleanPhone, password);
+        return userDao.findById(id);
+    }
+
+    public User updateAvatar(int id, String avatarUrl) {
+        if (id <= 0 || empty(avatarUrl)) throw new RuntimeException("头像地址无效。");
+        restrictionService.require("USER", id, "can_edit_avatar");
+        userDao.updateAvatar(id, avatarUrl.trim());
+        return userDao.findById(id);
+    }
+
+    public void requestCancel(int id) {
+        if (id <= 0) throw new RuntimeException("用户编号不正确。");
+        restrictionService.require("USER", id, "can_cancel_account");
+        userDao.requestCancel(id);
     }
 
     public void deleteUser(int id) {

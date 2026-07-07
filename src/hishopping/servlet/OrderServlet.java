@@ -14,6 +14,7 @@ import hishopping.dao.OrderDao;
 import hishopping.service.BusinessService;
 import hishopping.service.OrderService;
 import hishopping.service.UserService;
+import hishopping.service.AccountRestrictionService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -24,6 +25,7 @@ public class OrderServlet extends HttpServlet {
     private BusinessService businessService = new BusinessService();
     private MessageDao messageDao = new MessageDao();
     private OrderDao orderDao = new OrderDao();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         User user = ServletUtil.currentUser(request);
@@ -55,6 +57,7 @@ public class OrderServlet extends HttpServlet {
         try {
             result = ServletUtil.ok();
             if ("pay".equals(request.getParameter("action"))) {
+                restrictionService.require("USER", user.getId(), "can_pay");
                 orderService.pay(user.getId(), ServletUtil.intParam(request, "orderId", 0));
             } else if ("confirm".equals(request.getParameter("action"))) {
                 orderService.confirm(user.getId(), ServletUtil.intParam(request, "orderId", 0));
@@ -80,6 +83,7 @@ public class OrderServlet extends HttpServlet {
                 }
                 result.put("afterSaleId", afterSaleId);
             } else if ("review".equals(request.getParameter("action"))) {
+                restrictionService.require("USER", user.getId(), "can_review");
                 businessService.review(
                     ServletUtil.intParam(request, "orderId", 0),
                     ServletUtil.intParam(request, "productId", 0),
@@ -88,6 +92,7 @@ public class OrderServlet extends HttpServlet {
                     request.getParameter("content")
                 );
             } else {
+                restrictionService.require("USER", user.getId(), "can_order");
                 int platformCouponId = ServletUtil.intParam(request, "selectedPlatformCouponId", ServletUtil.intParam(request, "userCouponId", 0));
                 int stackableCouponId = ServletUtil.intParam(request, "selectedStackableCouponId", 0);
                 int merchantCouponId = ServletUtil.intParam(request, "selectedMerchantCouponId", 0);

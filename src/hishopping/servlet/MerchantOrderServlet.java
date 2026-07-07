@@ -16,6 +16,7 @@ import hishopping.dao.OrderDao;
 import hishopping.service.BusinessService;
 import hishopping.service.MerchantService;
 import hishopping.service.OrderService;
+import hishopping.service.AccountRestrictionService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -27,6 +28,7 @@ public class MerchantOrderServlet extends HttpServlet {
     private MessageDao messageDao = new MessageDao();
     private OrderDao orderDao = new OrderDao();
     private MerchantService merchantService = new MerchantService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Merchant merchant = ServletUtil.currentMerchant(request);
@@ -50,9 +52,12 @@ public class MerchantOrderServlet extends HttpServlet {
             return;
         }
         try {
+            restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_manage_order");
             if ("ship".equals(request.getParameter("action"))) {
+                restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_ship_order");
                 orderService.ship(merchant.getMerchantId(), ServletUtil.intParam(request, "orderId", 0), request.getParameter("expressCompany"), request.getParameter("trackingNo"));
             } else if ("afterSale".equals(request.getParameter("action"))) {
+                restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_handle_after_sale");
                 int afterSaleId = ServletUtil.intParam(request, "afterSaleId", 0);
                 businessService.handleAfterSaleByMerchant(afterSaleId, merchant.getMerchantId(), request.getParameter("handleAction"), request.getParameter("opinion"));
                 notifyAfterSaleHandled(merchant, afterSaleId);

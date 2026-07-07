@@ -13,14 +13,22 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
 
+import hishopping.entity.Merchant;
+import hishopping.entity.User;
+import hishopping.service.MerchantService;
+import hishopping.service.UserService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
 public class AvatarUploadServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
+    private UserService userService = new UserService();
+    private MerchantService merchantService = new MerchantService();
 
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        if (ServletUtil.currentUser(request) == null && ServletUtil.currentMerchant(request) == null) {
+        User user = ServletUtil.currentUser(request);
+        Merchant merchant = ServletUtil.currentMerchant(request);
+        if (user == null && merchant == null) {
             JsonUtil.write(response, ServletUtil.fail("请先登录后上传头像。"));
             return;
         }
@@ -47,8 +55,22 @@ public class AvatarUploadServlet extends HttpServlet {
         } finally {
             in.close();
         }
-        Map<String, Object> result = ServletUtil.ok();
-        result.put("avatarUrl", "assets/upload/avatar/" + fileName);
-        JsonUtil.write(response, result);
+        try {
+            String avatarUrl = "assets/upload/avatar/" + fileName;
+            Map<String, Object> result = ServletUtil.ok();
+            result.put("avatarUrl", avatarUrl);
+            if (user != null) {
+                User updated = userService.updateAvatar(user.getId(), avatarUrl);
+                request.getSession().setAttribute("user", updated);
+                result.put("user", ServletUtil.user(updated));
+            } else {
+                Merchant updated = merchantService.updateAvatar(merchant.getMerchantId(), avatarUrl);
+                request.getSession().setAttribute("merchant", updated);
+                result.put("merchant", ServletUtil.merchant(updated));
+            }
+            JsonUtil.write(response, result);
+        } catch (RuntimeException e) {
+            JsonUtil.write(response, ServletUtil.fail(e.getMessage()));
+        }
     }
 }

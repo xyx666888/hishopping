@@ -17,6 +17,7 @@ import hishopping.entity.Product;
 import hishopping.service.BusinessService;
 import hishopping.service.MerchantService;
 import hishopping.service.ProductService;
+import hishopping.service.AccountRestrictionService;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -26,6 +27,7 @@ public class AdminMerchantAuditServlet extends HttpServlet {
     private MerchantService service = new MerchantService();
     private ProductService productService = new ProductService();
     private BusinessService businessService = new BusinessService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Admin admin = ServletUtil.currentAdmin(request);
@@ -51,13 +53,14 @@ public class AdminMerchantAuditServlet extends HttpServlet {
                 merchant.setMerchantId(merchantId);
                 merchant.setMerchantName(request.getParameter("merchantName"));
                 merchant.setPassword(request.getParameter("password"));
+                merchant.setContactName(request.getParameter("contactName"));
                 merchant.setContactPhone(request.getParameter("contactPhone"));
                 merchant.setEmail(request.getParameter("email"));
                 merchant.setShopName(request.getParameter("shopName"));
                 merchant.setShopDesc(request.getParameter("shopDesc"));
                 merchant.setBusinessCategory(request.getParameter("businessCategory"));
                 merchant.setBusinessAddress(request.getParameter("businessAddress"));
-                service.updateProfile(merchant);
+                service.updateProfile(merchant, false);
             } else if ("productUpdate".equals(action)) {
                 Product product = new Product();
                 product.setId(ServletUtil.intParam(request, "productId", 0));
@@ -82,6 +85,15 @@ public class AdminMerchantAuditServlet extends HttpServlet {
                 businessService.logAdmin(admin.getId(), "AUDIT_PRODUCT", "PRODUCT", ServletUtil.intParam(request, "productId", 0), request.getParameter("auditAction"));
             } else if ("productSale".equals(action)) {
                 productService.changeMerchantProductSale(ServletUtil.intParam(request, "productId", 0), merchantId, request.getParameter("saleStatus"));
+            } else if ("restrict".equals(action)) {
+                int rawDays = ServletUtil.intParam(request, "durationDays", 0);
+                Integer days = rawDays > 0 ? Integer.valueOf(rawDays) : null;
+                String adminName = admin.getRealName() == null || admin.getRealName().length() == 0 ? admin.getAdminName() : admin.getRealName();
+                restrictionService.restrict("MERCHANT", merchantId, request.getParameter("permissionKey"), request.getParameter("reason"), "ADMIN", 0, days, admin.getId(), adminName);
+                businessService.logAdmin(admin.getId(), "RESTRICT_MERCHANT", "MERCHANT", merchantId, "限制权限 " + request.getParameter("permissionKey"));
+            } else if ("cancelRestriction".equals(action)) {
+                restrictionService.cancel(ServletUtil.intParam(request, "restrictionId", 0));
+                businessService.logAdmin(admin.getId(), "CANCEL_MERCHANT_RESTRICTION", "MERCHANT", merchantId, "解除权限限制");
             } else {
                 service.audit(merchantId, request.getParameter("status"), request.getParameter("opinion"), admin.getId());
                 businessService.logAdmin(admin.getId(), "AUDIT_MERCHANT", "MERCHANT", merchantId, request.getParameter("status"));

@@ -15,6 +15,8 @@ import hishopping.service.AddressService;
 import hishopping.service.CouponService;
 import hishopping.service.CouponService.IssueResult;
 import hishopping.service.BusinessService;
+import hishopping.service.AccountRestrictionService;
+import hishopping.entity.Admin;
 import hishopping.util.JsonUtil;
 import hishopping.util.ServletUtil;
 
@@ -25,6 +27,7 @@ public class AdminUserServlet extends HttpServlet {
     private AddressService addressService = new AddressService();
     private CouponService couponService = new CouponService();
     private BusinessService businessService = new BusinessService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         if (ServletUtil.currentAdmin(request) == null) {
@@ -40,6 +43,7 @@ public class AdminUserServlet extends HttpServlet {
             return;
         }
         request.setCharacterEncoding("UTF-8");
+        Admin admin = ServletUtil.currentAdmin(request);
         Map<String, Object> result;
         try {
             String action = request.getParameter("action");
@@ -75,6 +79,17 @@ public class AdminUserServlet extends HttpServlet {
                 int userId = ServletUtil.intParam(request, "userId", 0);
                 userService.restoreUser(userId);
                 businessService.logAdmin(ServletUtil.currentAdmin(request).getId(), "RESTORE_USER", "USER", userId, "\u6062\u590d\u7528\u6237\u8d26\u53f7");
+            } else if ("restrict".equals(action)) {
+                int userId = ServletUtil.intParam(request, "userId", 0);
+                int rawDays = ServletUtil.intParam(request, "durationDays", 0);
+                Integer days = rawDays > 0 ? Integer.valueOf(rawDays) : null;
+                String adminName = admin.getRealName() == null || admin.getRealName().length() == 0 ? admin.getAdminName() : admin.getRealName();
+                restrictionService.restrict("USER", userId, request.getParameter("permissionKey"), request.getParameter("reason"), "ADMIN", 0, days, admin.getId(), adminName);
+                businessService.logAdmin(admin.getId(), "RESTRICT_USER", "USER", userId, "限制权限 " + request.getParameter("permissionKey"));
+            } else if ("cancelRestriction".equals(action)) {
+                int userId = ServletUtil.intParam(request, "userId", 0);
+                restrictionService.cancel(ServletUtil.intParam(request, "restrictionId", 0));
+                businessService.logAdmin(admin.getId(), "CANCEL_USER_RESTRICTION", "USER", userId, "解除权限限制");
             } else {
                 userService.updateUser(
                     ServletUtil.intParam(request, "userId", 0),

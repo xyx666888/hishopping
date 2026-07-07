@@ -12,6 +12,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import hishopping.entity.CouponTemplate;
 import hishopping.entity.Merchant;
+import hishopping.service.AccountRestrictionService;
 import hishopping.service.CouponService;
 import hishopping.service.MerchantService;
 import hishopping.util.JsonUtil;
@@ -22,6 +23,7 @@ public class MerchantCouponServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     private CouponService service = new CouponService();
     private MerchantService merchantService = new MerchantService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Merchant merchant = ServletUtil.currentMerchant(request);
@@ -46,6 +48,7 @@ public class MerchantCouponServlet extends HttpServlet {
         }
         CouponService.IssueResult issueResult = null;
         try {
+            restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_manage_coupon");
             String action = request.getParameter("action");
             if ("issue".equals(action)) {
                 issueResult = service.issueMerchant(ServletUtil.intParam(request, "couponId", 0), request.getParameter("issueType"), request.getParameter("targetValue"), merchant.getMerchantId());
