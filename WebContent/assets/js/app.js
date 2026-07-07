@@ -51,6 +51,7 @@ var state = {
 	unreadMessages: 0,
 	messageContacts: [],
 	accountRequests: [],
+	adminAccountRequestFilter: "pending",
 	couponManageTab: "templates",
 	couponIssueForm: { couponId: "", issueType: "VIP_LEVEL", targetValue: "2", batch: true },
 	merchantCoupons: [],
@@ -90,7 +91,7 @@ var state = {
 	merchantMyReports: [],
 	merchantRelatedReports: [],
 	adminReports: [],
-	adminReportStatusFilter: "all",
+	adminReportStatusFilter: "PENDING",
 	adminReportKeyword: "",
 	adminReportPage: 1,
 	adminReportPageSize: 20,
@@ -142,6 +143,36 @@ function cloneCoupons(coupons) {
 var couponCatalog = cloneCoupons(state.coupons);
 var orderRefreshTimer = null;
 var toastTimer = null;
+var lastRenderedPage = "";
+
+function scrollableElements(root) {
+	if (!root) return [];
+	return Array.prototype.filter.call(root.querySelectorAll("*"), function(el) {
+		return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+	});
+}
+
+function captureScrollState(root) {
+	return {
+		pageX: window.pageXOffset || document.documentElement.scrollLeft || document.body.scrollLeft || 0,
+		pageY: window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0,
+		items: scrollableElements(root).map(function(el, index) {
+			return { index: index, top: el.scrollTop, left: el.scrollLeft };
+		})
+	};
+}
+
+function restoreScrollState(root, snapshot) {
+	if (!snapshot) return;
+	var elements = scrollableElements(root);
+	snapshot.items.forEach(function(item) {
+		var el = elements[item.index];
+		if (!el) return;
+		el.scrollTop = item.top;
+		el.scrollLeft = item.left;
+	});
+	window.scrollTo(snapshot.pageX || 0, snapshot.pageY || 0);
+}
 var captchaVisible = false;
 
 var userNavItems = [
@@ -927,7 +958,9 @@ function navBadgeCount(key) {
 	var count = 0;
 	if (key === "cart") count = cartCount();
 	if (key === "messages" || key === "merchantMessages" || key === "adminMessages") count = state.unreadMessages || 0;
+	if (key === "adminAccountRequests") count = (state.accountRequests || []).filter(function(item) { return item.status === "PENDING"; }).length;
 	if (key === "adminMerchantAudit") count = state.merchants.filter(function(m) { return m.status === "PENDING"; }).length + state.adminAuditProducts.filter(function(p) { return p.auditStatus === "PENDING"; }).length;
+	if (key === "adminReports") count = (state.adminReports || []).filter(function(report) { return report.status === "PENDING"; }).length;
 	if (count <= 0) return "";
 	return count >= 99 ? "99+" : String(count);
 }
@@ -956,7 +989,10 @@ function setPage(page) {
 	updateShellForRole();
 	renderNav();
 	renderPage();
-	loadPageData(page).then(renderPage).catch(function(err) {
+	loadPageData(page).then(function() {
+		renderNav();
+		renderPage();
+	}).catch(function(err) {
 		renderPage();
 		showToast(err.message || "数据加载失败，请稍后重试。");
 	});
@@ -995,8 +1031,8 @@ function loadPageData(page) {
 			state.user ? loadOrders() : Promise.resolve()
 		]);
 	}
-	if (page === "adminAccountRequests") return loadAccountRequests(true);
-	if (page === "adminReports") return loadAdminReports();
+	if (page === "adminAccountRequests") return Promise.all([loadAccountRequests(true), loadAdminReports()]);
+	if (page === "adminReports") return Promise.all([loadAdminReports(), loadAccountRequests(true)]);
 	if (page === "adminAnalytics") return loadAdminAnalytics();
 	if (isAdminPage(page)) return loadAdminProducts();
 	if (page === "coupons") return loadUserCoupons();
@@ -1173,7 +1209,9 @@ function loadAdminProducts() {
 		get("admin/orders"),
 		get("admin/merchants"),
 		get("admin/productAudit"),
-		get("admin/coupons")
+		get("admin/coupons"),
+		get("admin/accountRequests"),
+		get("admin/reports?action=list&status=all&page=1&pageSize=100")
 	]).then(function(results) {
 		if (results[0].success) state.products = results[0].products || state.products;
 		if (results[1].success) {
@@ -1194,6 +1232,8 @@ function loadAdminProducts() {
 			state.couponTemplates = results[5].templates || [];
 			state.couponLogs = results[5].logs || [];
 		}
+		if (results[6].success) state.accountRequests = results[6].requests || [];
+		if (results[7].success) state.adminReports = results[7].reports || [];
 	});
 }
 
@@ -1945,12 +1985,20 @@ function renderAccountRequestPanel(roleName) {
 }
 
 function renderAdminAccountRequests() {
-	var rows = (state.accountRequests || []).map(function(item) {
+	var allRequests = state.accountRequests || [];
+	var pendingRequests = allRequests.filter(function(item) { return item.status === "PENDING"; });
+	var processedRequests = allRequests.filter(function(item) { return item.status !== "PENDING"; });
+	var tab = state.adminAccountRequestFilter || "pending";
+	var visibleRequests = tab === "processed" ? processedRequests : pendingRequests;
+	var pendingActive = tab === "pending" ? "active" : "";
+	var processedActive = tab === "processed" ? "active" : "";
+	var rows = visibleRequests.map(function(item) {
 		var pending = item.status === "PENDING";
 		var attach = item.attachmentUrl ? '<div class="request-avatar-preview"><img src="' + escapeHtml(item.attachmentUrl) + '" alt=""></div>' : '';
 		return '<tr><td><b>#' + item.requestId + '</b><p class="muted">' + escapeHtml(item.createTime || "") + '</p></td><td>' + escapeHtml(item.actorRole) + ' #' + item.actorId + '<p class="muted">' + escapeHtml(item.actorName || "") + '</p></td><td>' + requestTypeText(item.requestType) + attach + '</td><td>' + escapeHtml(item.content || "") + '</td><td>' + requestStatusBadge(item.status) + '<p class="muted">' + escapeHtml(item.opinion || "") + '</p></td><td><input class="admin-input account-opinion" data-id="' + item.requestId + '" placeholder="审核意见" ' + (pending ? "" : "disabled") + '><div class="merchant-pending-buttons"><button class="primary-btn account-review" data-id="' + item.requestId + '" data-status="APPROVED" type="button" ' + (pending ? "" : "disabled") + '>通过</button><button class="ghost-btn account-review" data-id="' + item.requestId + '" data-status="REJECTED" type="button" ' + (pending ? "" : "disabled") + '>驳回</button></div></td></tr>';
-	}).join("") || '<tr><td colspan="6">暂无账号资料申请。</td></tr>';
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>资料审核</h2><p>集中处理用户和商家的头像、资料、注销与恢复申请，审核结果会进入对方消息中心。</p></div></div><div class="admin-table tall"><table><thead><tr><th>申请</th><th>提交人</th><th>类型</th><th>内容</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+	}).join("") || '<tr><td colspan="6">' + (tab === "processed" ? "暂无已审核资料申请。" : "暂无待审核资料申请。") + '</td></tr>';
+	var segments = '<div class="segmented admin-audit-segmented"><button class="account-request-filter pending-filter ' + pendingActive + '" data-filter="pending" type="button">待审核 <span class="segment-badge danger">' + pendingRequests.length + '</span></button><button class="account-request-filter approved-filter ' + processedActive + '" data-filter="processed" type="button">已审核 <span class="segment-badge">' + processedRequests.length + '</span></button></div>';
+	return '<section class="panel-card admin-section admin-review-page account-review-page"><div class="section-head"><div><h2>资料审核</h2><p>集中处理用户和商家的头像、资料、注销与恢复申请，审核结果会进入对方消息中心。</p></div>' + segments + '</div><div class="admin-table tall account-review-table"><table><thead><tr><th>申请</th><th>提交人</th><th>类型</th><th>内容</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
 }
 
 function renderVipCenter() {
@@ -2366,7 +2414,8 @@ function loadAdminReports() {
 	}
 	var page = Math.max(1, Number(state.adminReportPage || 1));
 	var pageSize = Math.max(1, Math.min(100, Number(state.adminReportPageSize || 20)));
-	var query = "admin/reports?action=list&status=" + encodeURIComponent(state.adminReportStatusFilter || "all") + "&keyword=" + encodeURIComponent(state.adminReportKeyword || "") + "&page=" + page + "&pageSize=" + pageSize;
+	var status = "all";
+	var query = "admin/reports?action=list&status=" + encodeURIComponent(status) + "&keyword=" + encodeURIComponent(state.adminReportKeyword || "") + "&page=" + page + "&pageSize=" + pageSize;
 	return get(query).then(function(data) {
 		if (data.success) {
 			state.adminReports = data.reports || [];
@@ -2610,7 +2659,7 @@ function renderAdminMerchantAudit() {
 	var pendingView = '<div class="admin-table tall merchant-pending-table"><table><thead><tr><th>商家编号</th><th>商家/店铺</th><th>联系人</th><th>邮箱</th><th>经营信息</th><th>状态</th><th>操作</th></tr></thead><tbody>' + pendingRows + '</tbody></table></div>';
 	var reviewedView = '<div class="section-head compact-head"><div><h3>已审核商家</h3><p>按商家维护资料，并在展开区管理该商家的商品。</p></div></div><div class="admin-table tall merchant-reviewed-table"><table><thead><tr><th>商家编号</th><th>商家/店铺</th><th>登录密码</th><th>手机号/邮箱</th><th>经营信息</th><th>状态</th><th>商品数</th><th>上架</th><th>下架</th><th>待审</th><th>操作</th></tr></thead><tbody>' + reviewedRows + '</tbody></table></div>' + productPanel;
 	var toolbar = '<div class="merchant-audit-toolbar"><label class="field admin-search-field"><span>搜索</span><input id="merchantManageSearch" value="' + escapeHtml(state.merchantManageSearch || "") + '" placeholder="商家名称、编号、手机号、邮箱"></label></div>';
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>商家管理</h2><p>后台按商家统一管理入驻审核、资料维护和商家商品。</p></div><div class="segmented merchant-segmented"><button class="merchant-filter pending-filter ' + pendingActive + '" data-filter="pending" type="button">待审核 <span class="segment-badge danger">' + allPendingMerchants.length + '</span></button><button class="merchant-filter approved-filter ' + reviewedActive + '" data-filter="approved" type="button">已审核 <span class="segment-badge">' + allReviewedMerchants.length + '</span></button></div></div>' + toolbar + (tab === "approved" ? reviewedView : pendingView) + '</section>';
+	return '<section class="panel-card admin-section merchant-management-page"><div class="section-head"><div><h2>商家管理</h2><p>后台按商家统一管理入驻审核、资料维护和商家商品。</p></div><div class="segmented merchant-segmented"><button class="merchant-filter pending-filter ' + pendingActive + '" data-filter="pending" type="button">待审核 <span class="segment-badge danger">' + allPendingMerchants.length + '</span></button><button class="merchant-filter approved-filter ' + reviewedActive + '" data-filter="approved" type="button">已审核 <span class="segment-badge">' + allReviewedMerchants.length + '</span></button></div></div>' + toolbar + (tab === "approved" ? reviewedView : pendingView) + '</section>';
 }
 function couponOwnerText(c) {
 	return c.couponOwnerType === "MERCHANT" ? ((c.shopName || "店铺") + "专属") : (c.stackable ? "平台可叠加" : "平台券");
@@ -2989,12 +3038,16 @@ function renderMerchantReports() {
 }
 
 function renderAdminReports() {
-	var statuses = ["all", "PENDING", "PROCESSING", "APPROVED", "REJECTED", "CLOSED"];
-	var options = statuses.map(function(status) {
-		var text = status === "all" ? "全部状态" : reportStatusText(status);
-		return '<option value="' + status + '" ' + (state.adminReportStatusFilter === status ? "selected" : "") + '>' + text + '</option>';
-	}).join("");
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>举报管理</h2><p>统一筛选、查看并处理用户和商家提交的举报。</p></div></div><div class="admin-user-toolbar"><label class="field"><span>状态</span><select id="adminReportStatusFilter">' + options + '</select></label><label class="field"><span>搜索</span><input id="adminReportKeyword" value="' + escapeHtml(state.adminReportKeyword || "") + '" placeholder="举报人、对象、类型、原因"></label></div>' + renderReportTable(state.adminReports, true, "暂无匹配举报。") + renderAdminReportPager() + '</section>';
+	var reports = state.adminReports || [];
+	var unhandled = reports.filter(function(report) { return report.status === "PENDING"; });
+	var handled = reports.filter(function(report) { return report.status !== "PENDING"; });
+	var tab = state.adminReportStatusFilter === "handled" ? "handled" : "PENDING";
+	var visibleReports = tab === "handled" ? handled : unhandled;
+	var unhandledActive = tab === "PENDING" ? "active" : "";
+	var handledActive = tab === "handled" ? "active" : "";
+	var segments = '<div class="segmented admin-report-segmented"><button class="admin-report-filter pending-filter ' + unhandledActive + '" data-filter="PENDING" type="button">未处理 <span class="segment-badge danger">' + unhandled.length + '</span></button><button class="admin-report-filter approved-filter ' + handledActive + '" data-filter="handled" type="button">已处理 <span class="segment-badge">' + handled.length + '</span></button></div>';
+	var toolbar = '<div class="admin-user-toolbar admin-report-toolbar"><label class="field admin-search-field"><span>搜索</span><input id="adminReportKeyword" value="' + escapeHtml(state.adminReportKeyword || "") + '" placeholder="举报人、对象、类型、原因"></label></div>';
+	return '<section class="panel-card admin-section admin-review-page report-review-page"><div class="section-head"><div><h2>举报管理</h2><p>统一筛选、查看并处理用户和商家提交的举报。</p></div>' + segments + '</div>' + toolbar + renderReportTable(visibleReports, true, "暂无匹配举报。") + renderAdminReportPager() + '</section>';
 }
 
 function renderReportModal() {
@@ -3455,14 +3508,19 @@ function bindPageActions() {
 			});
 		};
 	}
-	var adminReportStatusFilter = document.getElementById("adminReportStatusFilter");
-	if (adminReportStatusFilter) {
-		adminReportStatusFilter.onchange = function() {
-			state.adminReportStatusFilter = adminReportStatusFilter.value;
-			state.adminReportPage = 1;
-			loadAdminReports().then(renderPage);
+	Array.prototype.forEach.call(document.querySelectorAll(".account-request-filter"), function(btn) {
+		btn.onclick = function() {
+			state.adminAccountRequestFilter = btn.getAttribute("data-filter") || "pending";
+			renderPage();
 		};
-	}
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".admin-report-filter"), function(btn) {
+		btn.onclick = function() {
+			state.adminReportStatusFilter = btn.getAttribute("data-filter") || "PENDING";
+			state.adminReportPage = 1;
+			renderPage();
+		};
+	});
 	var adminReportKeyword = document.getElementById("adminReportKeyword");
 	if (adminReportKeyword) {
 		var reportSearchTimer = null;
@@ -3546,7 +3604,7 @@ function bindPageActions() {
 				punishTargetId: Number(targetParts[1] || 0),
 				durationDays: durationDays,
 				punishReason: document.getElementById("adminReportPunishReason").value,
-				filterStatus: state.adminReportStatusFilter || "all",
+				filterStatus: "all",
 				keyword: state.adminReportKeyword || "",
 				page: state.adminReportPage || 1,
 				pageSize: state.adminReportPageSize || 20
@@ -3558,6 +3616,7 @@ function bindPageActions() {
 				state.adminReportTotal = Number(data.total || state.adminReports.length || 0);
 				state.adminReportModal = null;
 				showToast("举报状态已更新");
+				renderNav();
 				renderPage();
 			});
 		};
@@ -3981,6 +4040,7 @@ function bindPageActions() {
 				if (!data.success) { alert(data.message || "提交失败"); return; }
 				state.accountRequests = data.requests || [];
 				showToast("申请已提交，等待管理员审核");
+				renderNav();
 				renderPage();
 			});
 		};
@@ -3998,6 +4058,7 @@ function bindPageActions() {
 				if (!data.success) { alert(data.message || "审核失败"); return; }
 				state.accountRequests = data.requests || [];
 				showToast("审核结果已发送到消息中心");
+				renderNav();
 				renderPage();
 			});
 		};
@@ -5261,6 +5322,8 @@ function bindDelegatedPageActions() {
 
 function renderPage() {
 	var root = document.getElementById("pageRoot");
+	var keepScroll = lastRenderedPage === state.page;
+	var scrollSnapshot = keepScroll ? captureScrollState(root) : null;
 	var html = "";
 	if (state.page === "home") html = renderHome();
 	if (state.page === "detail") html = renderDetail();
@@ -5295,6 +5358,11 @@ function renderPage() {
 	root.innerHTML = html + renderReportModal() + renderAdminReportModal();
 	bindDelegatedPageActions();
 	bindPageActions();
+	restoreScrollState(root, scrollSnapshot);
+	if (scrollSnapshot) setTimeout(function() {
+		restoreScrollState(root, scrollSnapshot);
+	}, 0);
+	lastRenderedPage = state.page;
 }
 
 function updateAuthView() {

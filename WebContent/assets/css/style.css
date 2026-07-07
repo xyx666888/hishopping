@@ -4413,6 +4413,35 @@ button {
 	min-width: 1480px;
 }
 
+.merchant-management-page {
+	min-height: min(760px, calc(100vh - 140px));
+}
+
+.merchant-management-page .merchant-pending-table,
+.merchant-management-page .merchant-reviewed-table {
+	max-height: 520px;
+}
+
+.admin-review-page {
+	min-height: min(700px, calc(100vh - 180px));
+}
+
+.admin-review-page .account-review-table,
+.admin-review-page .report-table {
+	min-height: 430px;
+	max-height: 520px;
+}
+
+.admin-review-page .segmented {
+	flex: 0 0 auto;
+}
+
+.admin-report-toolbar {
+	display: flex;
+	justify-content: flex-end;
+	margin: 14px 0 16px;
+}
+
 .admin-section {
 	margin-top: 24px;
 }
