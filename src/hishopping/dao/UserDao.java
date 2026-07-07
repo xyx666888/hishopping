@@ -15,7 +15,7 @@ import hishopping.util.DBUtil;
 public class UserDao {
     private static final String NORMAL_STATUS = "\u6b63\u5e38";
     private static final String DELETED_STATUS = "\u5df2\u5220\u9664";
-    private static final String USER_COLUMNS = "id, account_id, username, email, phone, password, role, points, vip_level, growth_value, status, avatar_url, create_time";
+    private static final String USER_COLUMNS = "id, account_id, username, email, phone, password, role, points, vip_level, growth_value, status, avatar_url, punish_reason, punish_start_time, punish_end_time, create_time";
     private static boolean accountIdChecked = false;
 
     public static int calculateVipLevel(int growthValue) {
@@ -78,6 +78,28 @@ public class UserDao {
             ps.setString(3, account);
             ps.setString(4, password);
             ps.setString(5, NORMAL_STATUS);
+            rs = ps.executeQuery();
+            return rs.next() ? mapUser(rs) : null;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(rs, ps, conn);
+        }
+    }
+
+    public User findAnyByLoginAndPassword(String account, String password) {
+        ensureAccountIdReady();
+        String sql = "select " + USER_COLUMNS + " from hishopping_user where (account_id=? or email=? or (phone is not null and phone<>'' and phone=?)) and password=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, account);
+            ps.setString(2, account);
+            ps.setString(3, account);
+            ps.setString(4, password);
             rs = ps.executeQuery();
             return rs.next() ? mapUser(rs) : null;
         } catch (SQLException e) {
@@ -304,6 +326,51 @@ public class UserDao {
         }
     }
 
+    public void applyPunishment(int userId, String status, String reason, Integer durationDays) {
+        ensureAccountIdReady();
+        String sql = durationDays == null
+            ? "update hishopping_user set status=?, punish_reason=?, punish_start_time=sysdatetime(), punish_end_time=null where id=? and role=N'user'"
+            : "update hishopping_user set status=?, punish_reason=?, punish_start_time=sysdatetime(), punish_end_time=dateadd(day, ?, sysdatetime()) where id=? and role=N'user'";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, status);
+            ps.setString(2, reason);
+            if (durationDays == null) {
+                ps.setInt(3, userId);
+            } else {
+                ps.setInt(3, durationDays.intValue());
+                ps.setInt(4, userId);
+            }
+            if (ps.executeUpdate() == 0) {
+                throw new RuntimeException("用户不存在或不允许处罚。");
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void restorePunishmentIfExpired(int userId) {
+        ensureAccountIdReady();
+        String sql = "update hishopping_user set status=N'正常', punish_reason=null, punish_start_time=null, punish_end_time=null where id=? and status in (N'冻结',N'停用') and punish_end_time is not null and punish_end_time<=sysdatetime()";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
     public User save(User user) {
         ensureAccountIdReady();
         String sql = "insert into hishopping_user(account_id,username,email,phone,password,role,points,vip_level,growth_value,status) values(?,?,?,?,?,?,?,?,?,?)";
@@ -427,6 +494,9 @@ public class UserDao {
             st.executeUpdate("if col_length('dbo.hishopping_user', 'growth_value') is null alter table dbo.hishopping_user add growth_value int not null constraint DF_hishopping_user_growth_value default 0");
             st.executeUpdate("if col_length('dbo.hishopping_user', 'create_time') is null alter table dbo.hishopping_user add create_time datetime2 not null constraint DF_hishopping_user_create_time default sysdatetime()");
             st.executeUpdate("if col_length('dbo.hishopping_user', 'avatar_url') is null alter table dbo.hishopping_user add avatar_url nvarchar(300) null");
+            st.executeUpdate("if col_length('dbo.hishopping_user', 'punish_reason') is null alter table dbo.hishopping_user add punish_reason nvarchar(500) null");
+            st.executeUpdate("if col_length('dbo.hishopping_user', 'punish_start_time') is null alter table dbo.hishopping_user add punish_start_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishopping_user', 'punish_end_time') is null alter table dbo.hishopping_user add punish_end_time datetime2 null");
             st.executeUpdate("update dbo.hishopping_user set account_id = right('100000' + cast(100000 + id as varchar(8)), case when id < 900000 then 6 else 8 end) where account_id is null or ltrim(rtrim(account_id)) = ''");
             st.executeUpdate("update dbo.hishopping_user set growth_value = case when growth_value > 0 then growth_value else points end");
             st.executeUpdate("update dbo.hishopping_user set vip_level = case when growth_value >= 24000 then 10 when growth_value >= 16000 then 9 when growth_value >= 11000 then 8 when growth_value >= 7000 then 7 when growth_value >= 4000 then 6 when growth_value >= 2000 then 5 when growth_value >= 1000 then 4 when growth_value >= 500 then 3 when growth_value >= 200 then 2 else 1 end");
@@ -461,7 +531,28 @@ public class UserDao {
         user.setGrowthValue(rs.getInt("growth_value"));
         user.setStatus(rs.getString("status"));
         user.setAvatarUrl(rs.getString("avatar_url"));
+        user.setPunishReason(getString(rs, "punish_reason"));
+        user.setPunishStartTime(time(rs, "punish_start_time"));
+        user.setPunishEndTime(time(rs, "punish_end_time"));
         user.setCreateTime(String.valueOf(rs.getTimestamp("create_time")));
         return user;
+    }
+
+    private String getString(ResultSet rs, String column) {
+        try {
+            Object value = rs.getObject(column);
+            return value == null ? "" : String.valueOf(value);
+        } catch (SQLException e) {
+            return "";
+        }
+    }
+
+    private String time(ResultSet rs, String column) {
+        try {
+            java.sql.Timestamp value = rs.getTimestamp(column);
+            return value == null ? "" : String.valueOf(value);
+        } catch (SQLException e) {
+            return "";
+        }
     }
 }

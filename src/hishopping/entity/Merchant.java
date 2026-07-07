@@ -16,6 +16,9 @@ public class Merchant {
     private String status;
     private String avatarUrl;
     private String rejectReason;
+    private String punishReason;
+    private String punishStartTime;
+    private String punishEndTime;
     private String createTime;
     private String updateTime;
     private String reviewTime;
@@ -51,6 +54,12 @@ public class Merchant {
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
     public String getRejectReason() { return rejectReason; }
     public void setRejectReason(String rejectReason) { this.rejectReason = rejectReason; }
+    public String getPunishReason() { return punishReason; }
+    public void setPunishReason(String punishReason) { this.punishReason = punishReason; }
+    public String getPunishStartTime() { return punishStartTime; }
+    public void setPunishStartTime(String punishStartTime) { this.punishStartTime = punishStartTime; }
+    public String getPunishEndTime() { return punishEndTime; }
+    public void setPunishEndTime(String punishEndTime) { this.punishEndTime = punishEndTime; }
     public String getCreateTime() { return createTime; }
     public void setCreateTime(String createTime) { this.createTime = createTime; }
     public String getUpdateTime() { return updateTime; }

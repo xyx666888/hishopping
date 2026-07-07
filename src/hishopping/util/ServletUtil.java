@@ -96,6 +96,9 @@ public class ServletUtil {
         map.put("growthValue", user.getGrowthValue());
         map.put("status", user.getStatus());
         map.put("avatarUrl", user.getAvatarUrl());
+        map.put("punishReason", user.getPunishReason());
+        map.put("punishStartTime", user.getPunishStartTime());
+        map.put("punishEndTime", user.getPunishEndTime());
         map.put("createTime", user.getCreateTime());
         return map;
     }
@@ -357,6 +360,9 @@ public class ServletUtil {
         map.put("status", m.getStatus());
         map.put("avatarUrl", m.getAvatarUrl());
         map.put("rejectReason", m.getRejectReason());
+        map.put("punishReason", m.getPunishReason());
+        map.put("punishStartTime", m.getPunishStartTime());
+        map.put("punishEndTime", m.getPunishEndTime());
         map.put("createTime", m.getCreateTime());
         map.put("reviewTime", m.getReviewTime());
         map.put("reviewAdminId", m.getReviewAdminId());

@@ -459,6 +459,41 @@ public class BusinessDao {
         }
     }
 
+    public int[] hideReview(int reviewId) {
+        Connection conn = null;
+        PreparedStatement find = null;
+        PreparedStatement update = null;
+        ResultSet rs = null;
+        try {
+            conn = DBUtil.getConn();
+            conn.setAutoCommit(false);
+            find = conn.prepareStatement("select top 1 product_id,user_id from hishop_product_review where review_id=?");
+            find.setInt(1, reviewId);
+            rs = find.executeQuery();
+            if (!rs.next()) throw new RuntimeException("评价不存在。");
+            int productId = rs.getInt("product_id");
+            int userId = rs.getInt("user_id");
+            close(rs, find);
+            rs = null;
+            find = null;
+            update = conn.prepareStatement("update hishop_product_review set status=N'HIDDEN', update_time=sysdatetime() where review_id=? and status=N'ACTIVE'");
+            update.setInt(1, reviewId);
+            if (update.executeUpdate() == 0) throw new RuntimeException("评价已隐藏或不可处理。");
+            updateProductRating(conn, productId);
+            conn.commit();
+            return new int[] { productId, userId };
+        } catch (SQLException e) {
+            rollback(conn);
+            throw new RuntimeException(e);
+        } catch (RuntimeException e) {
+            rollback(conn);
+            throw e;
+        } finally {
+            close(rs, find);
+            DBUtil.closeDBResource(null, update, conn);
+        }
+    }
+
     public Map<String, Object> reviewStatsForUser(int userId) {
         Map<String, Object> map = new java.util.LinkedHashMap<String, Object>();
         Connection conn = null;

@@ -96,6 +96,7 @@ var state = {
 	adminReportPageSize: 20,
 	adminReportTotal: 0,
 	adminReportModal: null,
+	openMoreMenu: "",
 	reportModal: null,
 	addresses: [],
 	selectedAddressId: null,
@@ -118,6 +119,13 @@ function apiUrl(url) {
 try {
 	state.couponCenterCollapsed = localStorage.getItem("hishoppingCouponCenterCollapsed") === "1";
 } catch (e) {}
+
+document.addEventListener("click", function(e) {
+	if (!state.openMoreMenu) return;
+	if (e.target && e.target.closest && e.target.closest(".more-menu-wrap")) return;
+	state.openMoreMenu = "";
+	renderPage();
+});
 
 function cloneCoupon(coupon) {
 	var copy = {};
@@ -1411,13 +1419,17 @@ function renderProductReviews(product) {
 			return '<div class="review-reply"><b>' + escapeHtml(role ? role + " · " + name : name) + '</b><span>' + escapeHtml(reply.content || "") + '</span><time>' + escapeHtml(shortDate(reply.createTime || "")) + '</time></div>';
 		}).join("");
 		var replyForm = state.activeReviewReplyId === reviewId ? '<form class="review-reply-form" data-id="' + reviewId + '"><textarea rows="2" placeholder="写下你的回复"></textarea><div><button class="ghost-btn review-reply-cancel" type="button">取消</button><button class="primary-btn" type="submit">发布回复</button></div></form>' : "";
+		var reviewMenu = renderMoreMenu("review-" + reviewId, [
+			{ label: "分享评价", className: "share-review", attrs: 'data-id="' + reviewId + '"' },
+			{ label: "举报该评价", className: "open-report", attrs: reportAttrs("REVIEW", reviewId, "恶意评价", { reviewId: reviewId, productId: review.productId || (product && product.id) || 0, title: "举报该评价", desc: "平台会核查评价内容、订单关联和沟通记录。" }) }
+		]);
 		return '<article class="review-item">' +
 			avatarMarkup(review.userAvatar, String(review.username || "匿").charAt(0), "review-avatar") +
-			'<div class="review-body"><div class="review-head"><strong>' + escapeHtml(review.username || "匿名用户") + '</strong><span class="rating">' + reviewStars(review.rating) + '</span><time>' + escapeHtml(shortDate(review.createTime || "")) + '</time></div>' +
+			'<div class="review-body"><div class="review-head"><strong>' + escapeHtml(review.username || "匿名用户") + '</strong><span class="rating">' + reviewStars(review.rating) + '</span><time>' + escapeHtml(shortDate(review.createTime || "")) + '</time>' + reviewMenu + '</div>' +
 			(sku ? '<div class="review-sku">' + escapeHtml(sku) + '</div>' : '') +
 			'<p>' + escapeHtml(review.content || "这位用户上传了图片/视频，没有填写文字评价。") + '</p>' +
 			(media ? '<div class="review-media-grid">' + media + '</div>' : '') +
-			'<div class="review-actions"><button class="ghost-btn review-like ' + (review.liked ? "active" : "") + '" data-id="' + reviewId + '" type="button">赞 <span>' + Number(review.likeCount || 0) + '</span></button><button class="ghost-btn review-reply-open" data-id="' + reviewId + '" type="button">回复</button><button class="ghost-btn open-report" data-target-role="REVIEW" data-target-id="' + reviewId + '" data-review-id="' + reviewId + '" data-product-id="' + (review.productId || (product && product.id) || 0) + '" data-report-type="恶意评价" type="button">举报评价</button></div>' +
+			'<div class="review-actions"><button class="ghost-btn review-like ' + (review.liked ? "active" : "") + '" data-id="' + reviewId + '" type="button">赞 <span>' + Number(review.likeCount || 0) + '</span></button><button class="ghost-btn review-reply-open" data-id="' + reviewId + '" type="button">回复</button></div>' +
 			(replies ? '<div class="review-replies">' + replies + '</div>' : '') + replyForm + '</div></article>';
 	}).join("") || '<div class="empty-cart compact-empty"><h3>暂无评价</h3><p class="muted">完成订单后可以发表真实评价，帮助其他用户判断这件商品是否适合自己。</p></div>';
 	var options = state.user ? reviewableOrderOptions(product.id) : "";
@@ -1556,17 +1568,22 @@ function renderDetail() {
 	var soldOut = !sku || sku.enabled === false || stock <= 0;
 	var subtotal = Number(sku && sku.price || product.price || 0) * state.detailQuantity;
 	var contactBtn = product.merchantId ? '<button class="ghost-btn detail-contact-merchant" data-merchant="' + product.merchantId + '" data-product="' + product.id + '" type="button">联系商家</button>' : '<button class="ghost-btn detail-contact-admin" data-product="' + product.id + '" type="button">联系平台</button>';
-	var reportBtns = state.user ? '<button class="ghost-btn open-report" data-target-role="PRODUCT" data-target-id="' + product.id + '" data-product-id="' + product.id + '" data-merchant-id="' + (product.merchantId || 0) + '" data-report-type="商品违规" type="button">举报商品</button>' + (product.merchantId ? '<button class="ghost-btn open-report" data-target-role="MERCHANT" data-target-id="' + product.merchantId + '" data-merchant-id="' + product.merchantId + '" data-report-type="商家违规" type="button">举报商家</button>' : '') : "";
+	var detailMenuItems = [
+		{ label: "分享商品", className: "share-product", attrs: 'data-id="' + product.id + '"' },
+		{ label: "举报商品", className: "open-report", attrs: reportAttrs("PRODUCT", product.id, "商品违规", { productId: product.id, merchantId: product.merchantId || 0, title: "举报商品：" + product.name, desc: "平台会核查商品信息、交易记录和店铺资质。" }) }
+	];
+	if (product.merchantId) detailMenuItems.push({ label: "举报商家", className: "open-report", attrs: reportAttrs("MERCHANT", product.merchantId, "商家违规", { merchantId: product.merchantId, title: "举报商家：" + (product.shopName || ("#" + product.merchantId)), desc: "平台会核查店铺经营行为和相关订单。" }) });
+	var moreMenu = renderMoreMenu("product-detail-" + product.id, detailMenuItems);
 	return '<div class="detail-page-head"><button class="detail-back-btn" type="button" title="返回"><img src="assets/img/back-return.png" alt="返回"></button><div><h2>商品详情</h2><p>查看规格、库存、优惠和店铺信息。</p></div></div><div class="detail-grid"><div class="panel-card detail-media-panel">' + productMediaCarousel(product) +
 		renderProductDisplayAttrs(product) + '<div class="detail-benefits"><span>正品保障</span><span>极速发货</span><span>7天无理由</span></div></div>' +
-		'<div class="panel-card detail-info"><div class="detail-title-actions"><div>' + badge(product.tag) + ' ' + badge("销量 " + product.sales, "green") + ' ' + badge("评分 " + product.rating, "amber") + '</div>' + favoriteButton(product.id, "detail-favorite") + '</div>' +
+		'<div class="panel-card detail-info"><div class="detail-title-actions"><div>' + badge(product.tag) + ' ' + badge("销量 " + product.sales, "green") + ' ' + badge("评分 " + product.rating, "amber") + '</div><div class="detail-more-actions">' + favoriteButton(product.id, "detail-favorite") + moreMenu + '</div></div>' +
 		'<h2>' + escapeHtml(product.name) + '</h2><p class="muted">' + escapeHtml(product.detailDesc) + '</p>' +
 		'<div class="product-flags detail-flags">' + productBusinessBadges(product) + '</div>' +
 		'<div class="price-box"><span>当前单价</span><strong>' + money(sku ? sku.price : product.price) + '</strong> <span class="old-price">' + money(sku ? sku.oldPrice : product.oldPrice) + '</span><p class="muted">库存：' + stock + ' · 小计：' + money(subtotal) + '</p></div>' +
 		attrHtml +
 		'<div class="detail-purchase"><strong>数量</strong><div class="qty"><button class="detail-qty" data-delta="-1" type="button">-</button><b>' + state.detailQuantity + '</b><button class="detail-qty" data-delta="1" type="button" ' + (state.detailQuantity >= stock ? "disabled" : "") + '>+</button></div><span class="muted">已选：' + escapeHtml(skuText(sku) || "默认") + ' · ' + money(sku ? sku.price : product.price) + ' × ' + state.detailQuantity + ' = ' + money(subtotal) + '</span></div>' +
 		(soldOut ? '<p class="muted sku-warning">当前规格暂无库存，请选择其他规格。</p>' : '') +
-		'<div class="dual-actions"><button class="primary-btn detail-add-cart" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>加入购物车</button><button class="ghost-btn detail-buy-now" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>立即购买</button>' + contactBtn + reportBtns + '</div></div></div>' + renderProductReviews(product);
+		'<div class="dual-actions"><button class="primary-btn detail-add-cart" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>加入购物车</button><button class="ghost-btn detail-buy-now" data-id="' + product.id + '" type="button" ' + (soldOut ? "disabled" : "") + '>立即购买</button>' + contactBtn + '</div></div></div>' + renderProductReviews(product);
 }
 
 function renderCart() {
@@ -1651,8 +1668,12 @@ function renderOrders() {
 		var batchText = order.batchNo ? '<p class="muted">同批次下单：' + escapeHtml(order.batchNo) + '</p>' : "";
 		var consultMerchant = order.merchantId ? '<button class="ghost-btn order-contact-merchant" data-merchant="' + order.merchantId + '" data-order="' + order.id + '" type="button">咨询商家</button>' : "";
 		var consultAdmin = '<button class="ghost-btn order-contact-admin" data-order="' + order.id + '" type="button">联系平台</button>';
-		var reportOrderBtn = '<button class="ghost-btn open-report" data-target-role="ORDER" data-target-id="' + order.id + '" data-order-id="' + order.id + '" data-merchant-id="' + (order.merchantId || 0) + '" data-report-type="订单纠纷" type="button">举报订单</button>';
-		return '<article class="order-card"><div class="order-top"><div><span class="muted">' + escapeHtml(order.orderNo) + '</span><h3>' + escapeHtml(order.shopName || "平台自营") + '</h3><p class="order-items-text">' + items + '</p>' + batchText + '<p class="muted">下单时间：' + escapeHtml(order.createTime) + '</p><p class="muted">收货地址：' + escapeHtml(order.receiverAddress) + '</p>' + (logistics ? '<p class="muted">物流信息：' + logistics + '</p>' : '') + '<p class="muted">商品总额：' + money(orderOriginAmount(order)) + ' · 优惠：-' + money(order.discountAmount || 0) + '</p></div><div style="text-align:right;">' + badge(order.status, tone) + '<div class="price" style="margin-top:10px;">' + money(order.totalAmount) + '</div></div></div><div class="order-actions">' + payBtn + confirmBtn + cancelBtn + consultMerchant + consultAdmin + afterSaleBtns + reviewBtns + reportOrderBtn + '<button class="ghost-btn rebuy-order" data-id="' + order.id + '" type="button">再次购买</button></div></article>';
+		var orderMenu = renderMoreMenu("user-order-" + order.id, [
+			{ label: "举报订单", className: "open-report", attrs: reportAttrs("ORDER", order.id, "订单纠纷", { orderId: order.id, merchantId: order.merchantId || 0, title: "举报订单：" + order.orderNo, desc: "平台会校验该订单是否属于当前账号。" }) },
+			{ label: "联系平台", className: "order-contact-admin", attrs: 'data-order="' + order.id + '"' },
+			{ label: "联系商家", className: order.merchantId ? "order-contact-merchant" : "disabled", attrs: 'data-merchant="' + (order.merchantId || 0) + '" data-order="' + order.id + '"' }
+		]);
+		return '<article class="order-card"><div class="order-top"><div><span class="muted">' + escapeHtml(order.orderNo) + '</span><h3>' + escapeHtml(order.shopName || "平台自营") + '</h3><p class="order-items-text">' + items + '</p>' + batchText + '<p class="muted">下单时间：' + escapeHtml(order.createTime) + '</p><p class="muted">收货地址：' + escapeHtml(order.receiverAddress) + '</p>' + (logistics ? '<p class="muted">物流信息：' + logistics + '</p>' : '') + '<p class="muted">商品总额：' + money(orderOriginAmount(order)) + ' · 优惠：-' + money(order.discountAmount || 0) + '</p></div><div style="text-align:right;">' + orderMenu + badge(order.status, tone) + '<div class="price" style="margin-top:10px;">' + money(order.totalAmount) + '</div></div></div><div class="order-actions">' + payBtn + confirmBtn + cancelBtn + afterSaleBtns + reviewBtns + '<button class="ghost-btn rebuy-order" data-id="' + order.id + '" type="button">再次购买</button></div></article>';
 	}).join("");
 }
 
@@ -1975,11 +1996,15 @@ function renderCoupons() {
 }
 
 function statusText(status) {
-	return ({ PENDING: "待审核", APPROVED: "已通过", REJECTED: "已驳回", DISABLED: "已禁用", ON_SALE: "已上架", OFF_SALE: "已下架", ENABLED: "启用", UNUSED: "未使用", USED: "已使用", EXPIRED: "已过期" })[status] || status || "";
+	return ({ PENDING: "待审核", APPROVED: "已通过", REJECTED: "已驳回", FROZEN: "已冻结", DISABLED: "已停用", BANNED: "已封禁", ON_SALE: "已上架", OFF_SALE: "已下架", ENABLED: "启用", UNUSED: "未使用", USED: "已使用", EXPIRED: "已过期" })[status] || status || "";
 }
 
 function merchantStatusTone(status) {
-	return status === "APPROVED" ? "green" : (status === "REJECTED" || status === "DISABLED" ? "rose" : "amber");
+	return status === "APPROVED" ? "green" : (status === "REJECTED" || status === "DISABLED" || status === "BANNED" ? "rose" : "amber");
+}
+
+function userStatusTone(status) {
+	return status === "正常" ? "green" : (status === "封禁" || status === "停用" ? "red" : "amber");
 }
 
 function couponValueText(coupon) {
@@ -2034,8 +2059,12 @@ function renderMerchantOrders() {
 	var rows = merchantOrderRows().map(function(order) {
 		var canShip = order.status === "待发货";
 		var afterSales = (order.afterSales || []).map(function(a) { return '#' + a.afterSaleId + ' 商品' + a.productId + ' ' + escapeHtml(a.status || ""); }).join("<br>") || "-";
-		var reportUser = '<button class="ghost-btn open-report" data-target-role="USER" data-target-id="' + order.userId + '" data-order-id="' + order.id + '" data-merchant-id="' + (order.merchantId || 0) + '" data-report-type="用户违规" type="button">举报用户</button>';
-		return '<tr><td><b>' + escapeHtml(order.orderNo) + '</b><p class="muted">' + escapeHtml(order.createTime || "") + '</p>' + (order.batchNo ? '<p class="muted">批次：' + escapeHtml(order.batchNo) + '</p>' : '') + '</td><td>' + orderItemsSummary(order) + '</td><td>用户 ' + escapeHtml(order.userId) + '</td><td>' + escapeHtml(order.receiverName || "") + '<p class="muted">' + escapeHtml(order.receiverPhone || "") + '</p></td><td>' + escapeHtml(order.receiverAddress || "") + '</td><td>' + (shipmentSummary(order) || "-") + '</td><td>' + afterSales + '</td><td><b>' + money(order.totalAmount) + '</b><p class="muted">商品 ' + money(orderOriginAmount(order)) + '</p></td><td>' + badge(order.status, order.status === "已完成" ? "green" : (order.status === "已取消" ? "red" : "amber")) + '</td><td><button class="primary-btn merchant-order-ship" data-id="' + order.id + '" type="button" ' + (canShip ? "" : "disabled") + '>发货</button>' + reportUser + '</td></tr>';
+		var orderMenu = renderMoreMenu("merchant-order-" + order.id, [
+			{ label: "举报用户", className: "open-report", attrs: reportAttrs("USER", order.userId, "用户违规", { orderId: order.id, merchantId: order.merchantId || 0, title: "举报用户 #" + order.userId, desc: "平台会校验该用户是否与本店存在订单或浏览关联。" }) },
+			{ label: "联系用户 / 查看沟通", className: "order-contact-user", attrs: 'data-user="' + order.userId + '" data-order="' + order.id + '"' },
+			{ label: "查看订单详情", className: "merchant-order-detail", attrs: 'data-id="' + order.id + '"' }
+		]);
+		return '<tr><td><b>' + escapeHtml(order.orderNo) + '</b><p class="muted">' + escapeHtml(order.createTime || "") + '</p>' + (order.batchNo ? '<p class="muted">批次：' + escapeHtml(order.batchNo) + '</p>' : '') + '</td><td>' + orderItemsSummary(order) + '</td><td>用户 ' + escapeHtml(order.userId) + '</td><td>' + escapeHtml(order.receiverName || "") + '<p class="muted">' + escapeHtml(order.receiverPhone || "") + '</p></td><td>' + escapeHtml(order.receiverAddress || "") + '</td><td>' + (shipmentSummary(order) || "-") + '</td><td>' + afterSales + '</td><td><b>' + money(order.totalAmount) + '</b><p class="muted">商品 ' + money(orderOriginAmount(order)) + '</p></td><td>' + badge(order.status, order.status === "已完成" ? "green" : (order.status === "已取消" ? "red" : "amber")) + '</td><td><div class="merchant-row-actions"><button class="primary-btn merchant-order-ship" data-id="' + order.id + '" type="button" ' + (canShip ? "" : "disabled") + '>发货</button>' + orderMenu + '</div></td></tr>';
 	}).join("") || '<tr><td colspan="11">暂无匹配订单。</td></tr>';
 	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>订单管理</h2><p>仅展示本店商品相关订单，待发货订单可由商家填写物流发货。</p></div><select class="admin-input compact-select" id="merchantOrderStatusFilter"><option value="all">全部状态</option>' + statuses.map(function(status) { return '<option value="' + status + '" ' + (state.merchantOrderStatusFilter === status ? "selected" : "") + '>' + status + '</option>'; }).join("") + '</select></div><div class="admin-table tall merchant-orders-table"><table><thead><tr><th>订单编号</th><th>本店商品</th><th>买家</th><th>收货人</th><th>收货地址</th><th>物流</th><th>售后</th><th>本店金额</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
 }
@@ -2556,7 +2585,7 @@ function renderAdminMerchantProducts(merchant) {
 function renderAdminMerchantAudit() {
 	var tab = state.merchantAuditFilter || "pending";
 	var allPendingMerchants = state.merchants.filter(function(m) { return m.status === "PENDING" || m.status === "REJECTED"; });
-	var allReviewedMerchants = state.merchants.filter(function(m) { return m.status === "APPROVED" || m.status === "DISABLED"; });
+	var allReviewedMerchants = state.merchants.filter(function(m) { return ["APPROVED", "FROZEN", "DISABLED", "BANNED"].indexOf(m.status) >= 0; });
 	var pendingMerchants = allPendingMerchants.filter(merchantMatchesSearch);
 	var reviewedMerchants = allReviewedMerchants.filter(merchantMatchesSearch);
 	var pendingRows = pendingMerchants.map(function(m) {
@@ -2571,7 +2600,7 @@ function renderAdminMerchantAudit() {
 			'<td><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="merchantName" value="' + escapeHtml(m.merchantName || "") + '"><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="shopName" value="' + escapeHtml(m.shopName || "") + '" placeholder="店铺名称"></td>' +			'<td><div class="password-cell"><input class="admin-input merchant-field merchant-password-input" data-id="' + m.merchantId + '" data-field="password" type="password" value="' + escapeHtml(m.registerPasswordDemo || "") + '"><button class="ghost-btn password-toggle" data-id="' + m.merchantId + '" type="button">显示</button></div></td>' +
 			'<td><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="contactPhone" value="' + escapeHtml(m.contactPhone || "") + '"><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="email" value="' + escapeHtml(m.email || "") + '" placeholder="邮箱"></td>' +
 			'<td><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="businessCategory" value="' + escapeHtml(m.businessCategory || "") + '"><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="businessAddress" value="' + escapeHtml(m.businessAddress || "") + '" placeholder="经营地址"></td>' +
-			'<td>' + badge(statusText(m.status), m.status === "APPROVED" ? "green" : "amber") + '</td><td><b>' + stats.total + '</b></td><td>' + stats.onSale + '</td><td>' + stats.offSale + '</td><td>' + stats.pending + '<p class="muted">待处理</p></td>' +			'<td><div class="merchant-action-group"><button class="primary-btn merchant-save" data-id="' + m.merchantId + '" type="button">保存资料</button><button class="ghost-btn merchant-audit" data-id="' + m.merchantId + '" data-status="' + toggleStatus + '" type="button">' + toggleText + '</button><button class="ghost-btn merchant-products-toggle" data-id="' + m.merchantId + '" type="button">' + (expanded ? "收起商品" : "查看/管理商品") + '</button></div></td></tr>';
+			'<td>' + badge(statusText(m.status), merchantStatusTone(m.status)) + (m.punishReason ? '<p class="muted">' + escapeHtml(m.punishReason) + '</p>' : '') + '</td><td><b>' + stats.total + '</b></td><td>' + stats.onSale + '</td><td>' + stats.offSale + '</td><td>' + stats.pending + '<p class="muted">待处理</p></td>' +			'<td><div class="merchant-action-group"><button class="primary-btn merchant-save" data-id="' + m.merchantId + '" type="button">保存资料</button><button class="ghost-btn merchant-audit" data-id="' + m.merchantId + '" data-status="' + toggleStatus + '" type="button">' + toggleText + '</button><button class="ghost-btn merchant-products-toggle" data-id="' + m.merchantId + '" type="button">' + (expanded ? "收起商品" : "查看/管理商品") + '</button></div></td></tr>';
 		return row;
 	}).join("") || '<tr><td colspan="11">暂无已审核商家。</td></tr>';
 	var expandedMerchant = reviewedMerchants.filter(function(m) { return String(state.merchantExpandedId || "") === String(m.merchantId); })[0];
@@ -2692,7 +2721,7 @@ function renderAdminUserFilters() {
 	vipRules.forEach(function(rule) {
 		vipOptions.push('<option value="' + rule.level + '" ' + (String(state.adminUserVipFilter) === String(rule.level) ? "selected" : "") + '>VIP' + rule.level + '</option>');
 	});
-	return '<div class="admin-user-toolbar"><label class="field"><span>搜索</span><input id="adminUserSearch" value="' + escapeHtml(state.adminUserSearch || "") + '" placeholder="用户ID、用户名、手机号、邮箱"></label><label class="field"><span>状态</span><select id="adminUserStatusFilter"><option value="all">全部状态</option><option value="正常" ' + (state.adminUserStatusFilter === "正常" ? "selected" : "") + '>正常</option><option value="停用" ' + (state.adminUserStatusFilter === "停用" ? "selected" : "") + '>停用</option></select></label><label class="field"><span>VIP</span><select id="adminUserVipFilter">' + vipOptions.join("") + '</select></label><label class="field"><span>订单</span><select id="adminUserOrderFilter"><option value="all">全部用户</option><option value="has" ' + (state.adminUserOrderFilter === "has" ? "selected" : "") + '>有订单</option><option value="none" ' + (state.adminUserOrderFilter === "none" ? "selected" : "") + '>无订单</option></select></label><label class="field"><span>排序</span><select id="adminUserSort"><option value="createDesc" ' + (state.adminUserSort === "createDesc" ? "selected" : "") + '>注册时间从新到旧</option><option value="createAsc" ' + (state.adminUserSort === "createAsc" ? "selected" : "") + '>注册时间从旧到新</option><option value="spendDesc" ' + (state.adminUserSort === "spendDesc" ? "selected" : "") + '>消费金额从高到低</option><option value="spendAsc" ' + (state.adminUserSort === "spendAsc" ? "selected" : "") + '>消费金额从低到高</option></select></label></div>';
+	return '<div class="admin-user-toolbar"><label class="field"><span>搜索</span><input id="adminUserSearch" value="' + escapeHtml(state.adminUserSearch || "") + '" placeholder="用户ID、用户名、手机号、邮箱"></label><label class="field"><span>状态</span><select id="adminUserStatusFilter"><option value="all">全部状态</option><option value="正常" ' + (state.adminUserStatusFilter === "正常" ? "selected" : "") + '>正常</option><option value="冻结" ' + (state.adminUserStatusFilter === "冻结" ? "selected" : "") + '>冻结</option><option value="停用" ' + (state.adminUserStatusFilter === "停用" ? "selected" : "") + '>停用</option><option value="封禁" ' + (state.adminUserStatusFilter === "封禁" ? "selected" : "") + '>封禁</option></select></label><label class="field"><span>VIP</span><select id="adminUserVipFilter">' + vipOptions.join("") + '</select></label><label class="field"><span>订单</span><select id="adminUserOrderFilter"><option value="all">全部用户</option><option value="has" ' + (state.adminUserOrderFilter === "has" ? "selected" : "") + '>有订单</option><option value="none" ' + (state.adminUserOrderFilter === "none" ? "selected" : "") + '>无订单</option></select></label><label class="field"><span>排序</span><select id="adminUserSort"><option value="createDesc" ' + (state.adminUserSort === "createDesc" ? "selected" : "") + '>注册时间从新到旧</option><option value="createAsc" ' + (state.adminUserSort === "createAsc" ? "selected" : "") + '>注册时间从旧到新</option><option value="spendDesc" ' + (state.adminUserSort === "spendDesc" ? "selected" : "") + '>消费金额从高到低</option><option value="spendAsc" ' + (state.adminUserSort === "spendAsc" ? "selected" : "") + '>消费金额从低到高</option></select></label></div>';
 }
 
 function renderAdminUserList() {
@@ -2701,7 +2730,7 @@ function renderAdminUserList() {
 		var coupons = adminUserCoupons(user.id);
 		var vip = currentVip(user);
 		var active = String(state.adminSelectedUserId) === String(user.id) ? " active" : "";
-		return '<tr class="admin-user-row' + active + '" data-id="' + user.id + '"><td><b>' + escapeHtml(user.accountId || user.id) + '</b></td><td>' + escapeHtml(user.username) + '</td><td>' + escapeHtml(user.phone || "") + '</td><td>' + escapeHtml(user.email || "") + '</td><td>' + badge(user.status || "正常", user.status === "停用" ? "red" : "green") + '</td><td><span class="admin-vip"><img src="' + vipBadgeSrc(vip.level) + '" alt="VIP' + vip.level + '"><b>VIP' + vip.level + '</b><small>' + escapeHtml(vip.name) + '</small></span></td><td>' + growthValue(user) + '</td><td>' + Number(user.points || 0) + '</td><td>' + orders.length + '</td><td><b>' + money(adminUserSpend(user.id)) + '</b></td><td>' + coupons.length + '</td><td>' + escapeHtml((user.createTime || "").slice(0, 19)) + '</td><td><button class="danger-btn admin-user-delete" data-id="' + user.id + '" type="button">删除</button></td></tr>';
+		return '<tr class="admin-user-row' + active + '" data-id="' + user.id + '"><td><b>' + escapeHtml(user.accountId || user.id) + '</b></td><td>' + escapeHtml(user.username) + '</td><td>' + escapeHtml(user.phone || "") + '</td><td>' + escapeHtml(user.email || "") + '</td><td>' + badge(user.status || "正常", userStatusTone(user.status)) + (user.punishReason ? '<p class="muted">' + escapeHtml(user.punishReason) + '</p>' : '') + '</td><td><span class="admin-vip"><img src="' + vipBadgeSrc(vip.level) + '" alt="VIP' + vip.level + '"><b>VIP' + vip.level + '</b><small>' + escapeHtml(vip.name) + '</small></span></td><td>' + growthValue(user) + '</td><td>' + Number(user.points || 0) + '</td><td>' + orders.length + '</td><td><b>' + money(adminUserSpend(user.id)) + '</b></td><td>' + coupons.length + '</td><td>' + escapeHtml((user.createTime || "").slice(0, 19)) + '</td><td><button class="danger-btn admin-user-delete" data-id="' + user.id + '" type="button">删除</button></td></tr>';
 	}).join("") || '<tr><td colspan="13">暂无匹配用户。</td></tr>';
 	return '<div class="admin-table tall admin-user-table"><table><thead><tr><th>用户ID</th><th>用户名</th><th>手机号</th><th>邮箱</th><th>状态</th><th>VIP等级</th><th>成长值</th><th>积分</th><th>订单数</th><th>消费总额</th><th>优惠券</th><th>注册时间</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
@@ -2721,7 +2750,7 @@ function renderAdminUserTabs() {
 function renderAdminUserBasic(user) {
 	var visible = !!state.adminUserPasswordVisible[user.id];
 	var passwordText = visible ? (user.currentPassword || "") : "&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;";
-	return '<div class="admin-user-form"><label class="field"><span>用户名</span><input class="admin-input" id="adminUserName" value="' + escapeHtml(user.username) + '"></label><label class="field"><span>手机号</span><input class="admin-input" id="adminUserPhone" value="' + escapeHtml(user.phone || "") + '"></label><label class="field"><span>邮箱</span><input class="admin-input" id="adminUserEmail" value="' + escapeHtml(user.email || "") + '"></label><label class="field"><span>当前密码</span><div class="admin-password-view"><code>' + (visible ? escapeHtml(passwordText) : passwordText) + '</code><button class="ghost-btn admin-user-password-toggle ' + (visible ? "visible" : "") + '" data-id="' + user.id + '" type="button" title="' + (visible ? "隐藏当前密码" : "显示当前密码") + '" aria-label="' + (visible ? "隐藏当前密码" : "显示当前密码") + '"><span class="eye-icon" aria-hidden="true"></span></button></div></label><label class="field"><span>新密码</span><input class="admin-input" id="adminUserPassword" type="password" placeholder="留空则不修改"></label><label class="field"><span>状态</span><select class="admin-input" id="adminUserStatus"><option ' + (user.status === "正常" ? "selected" : "") + '>正常</option><option ' + (user.status === "停用" ? "selected" : "") + '>停用</option></select></label><div class="profile-metrics"><div><b>' + adminUserOrders(user.id).length + '</b><span>订单</span></div><div><b>' + money(adminUserSpend(user.id)) + '</b><span>消费</span></div><div><b>' + adminUserCoupons(user.id).length + '</b><span>优惠券</span></div></div><button class="primary-btn admin-user-save" data-id="' + user.id + '" type="button">保存基础信息</button></div>';
+	return '<div class="admin-user-form"><label class="field"><span>用户名</span><input class="admin-input" id="adminUserName" value="' + escapeHtml(user.username) + '"></label><label class="field"><span>手机号</span><input class="admin-input" id="adminUserPhone" value="' + escapeHtml(user.phone || "") + '"></label><label class="field"><span>邮箱</span><input class="admin-input" id="adminUserEmail" value="' + escapeHtml(user.email || "") + '"></label><label class="field"><span>当前密码</span><div class="admin-password-view"><code>' + (visible ? escapeHtml(passwordText) : passwordText) + '</code><button class="ghost-btn admin-user-password-toggle ' + (visible ? "visible" : "") + '" data-id="' + user.id + '" type="button" title="' + (visible ? "隐藏当前密码" : "显示当前密码") + '" aria-label="' + (visible ? "隐藏当前密码" : "显示当前密码") + '"><span class="eye-icon" aria-hidden="true"></span></button></div></label><label class="field"><span>新密码</span><input class="admin-input" id="adminUserPassword" type="password" placeholder="留空则不修改"></label><label class="field"><span>状态</span><select class="admin-input" id="adminUserStatus"><option ' + (user.status === "正常" ? "selected" : "") + '>正常</option><option ' + (user.status === "冻结" ? "selected" : "") + '>冻结</option><option ' + (user.status === "停用" ? "selected" : "") + '>停用</option><option ' + (user.status === "封禁" ? "selected" : "") + '>封禁</option></select></label>' + (user.punishReason ? '<p class="muted wide">处罚原因：' + escapeHtml(user.punishReason) + (user.punishEndTime ? '，预计恢复：' + escapeHtml((user.punishEndTime || "").slice(0, 19)) : '') + '</p>' : '') + '<div class="profile-metrics"><div><b>' + adminUserOrders(user.id).length + '</b><span>订单</span></div><div><b>' + money(adminUserSpend(user.id)) + '</b><span>消费</span></div><div><b>' + adminUserCoupons(user.id).length + '</b><span>优惠券</span></div></div><button class="primary-btn admin-user-save" data-id="' + user.id + '" type="button">保存基础信息</button></div>';
 }
 
 function renderAdminUserOrderItems(order) {
@@ -2780,7 +2809,7 @@ function renderAdminUserDetail() {
 	else if (state.adminUserDetailTab === "coupons") body = renderAdminUserCoupons(user);
 	else if (state.adminUserDetailTab === "logs") body = renderAdminUserLogs(user);
 	else body = renderAdminUserBasic(user);
-	return '<section class="panel-card admin-user-detail"><div class="admin-user-detail-head"><div class="admin-user-title"><h2>' + escapeHtml(user.username) + '</h2><p>' + escapeHtml(userMeta) + '</p></div>' + badge(user.status || "正常", user.status === "停用" ? "red" : "green") + '</div>' + renderAdminUserTabs() + body + '</section>';
+	return '<section class="panel-card admin-user-detail"><div class="admin-user-detail-head"><div class="admin-user-title"><h2>' + escapeHtml(user.username) + '</h2><p>' + escapeHtml(userMeta) + '</p></div>' + badge(user.status || "正常", userStatusTone(user.status)) + '</div>' + renderAdminUserTabs() + body + '</section>';
 }
 
 function adminOrderRows() {
@@ -2825,6 +2854,57 @@ function reportRoleText(role) {
 	if (role === "ORDER") return "订单";
 	if (role === "REVIEW") return "评价";
 	return "用户";
+}
+
+function renderMoreMenu(key, items) {
+	var open = state.openMoreMenu === key;
+	var rows = (items || []).map(function(item) {
+		return '<button class="more-menu-item ' + (item.className || "") + '" ' + (item.attrs || "") + ' type="button">' + escapeHtml(item.label || "") + '</button>';
+	}).join("");
+	return '<div class="more-menu-wrap ' + (open ? "open" : "") + '"><button class="more-menu-toggle" data-menu="' + escapeHtml(key) + '" type="button" aria-label="更多操作" title="更多操作">...</button>' + (open ? '<div class="more-menu-panel">' + rows + '<button class="more-menu-item more-menu-cancel" type="button">取消</button></div>' : "") + '</div>';
+}
+
+function reportAttrs(role, id, type, extra) {
+	extra = extra || {};
+	var attrs = 'data-target-role="' + escapeHtml(role) + '" data-target-id="' + Number(id || 0) + '" data-report-type="' + escapeHtml(type || "其他") + '"';
+	if (extra.merchantId) attrs += ' data-merchant-id="' + Number(extra.merchantId) + '"';
+	if (extra.orderId) attrs += ' data-order-id="' + Number(extra.orderId) + '"';
+	if (extra.productId) attrs += ' data-product-id="' + Number(extra.productId) + '"';
+	if (extra.reviewId) attrs += ' data-review-id="' + Number(extra.reviewId) + '"';
+	if (extra.title) attrs += ' data-report-title="' + escapeHtml(extra.title) + '"';
+	if (extra.desc) attrs += ' data-report-desc="' + escapeHtml(extra.desc) + '"';
+	return attrs;
+}
+
+function adminReportActions(report) {
+	var actions = [
+		["RECORD_ONLY", "仅记录处理意见"],
+		["WARN_USER", "警告用户"],
+		["FREEZE_USER", "冻结用户"],
+		["DISABLE_USER", "停用用户"],
+		["BAN_USER", "封禁用户"],
+		["WARN_MERCHANT", "警告商家"],
+		["FREEZE_MERCHANT", "冻结商家"],
+		["DISABLE_MERCHANT", "停用商家"],
+		["BAN_MERCHANT", "封禁商家"],
+		["OFF_SALE_PRODUCT", "下架商品"],
+		["HIDE_REVIEW", "隐藏评价"]
+	];
+	return actions.map(function(item) {
+		return '<option value="' + item[0] + '">' + item[1] + '</option>';
+	}).join("");
+}
+
+function adminReportTargetOptions(report) {
+	var options = [];
+	if ((report.userId || 0) > 0) options.push(["USER", report.userId, "用户 #" + report.userId]);
+	if ((report.merchantId || 0) > 0) options.push(["MERCHANT", report.merchantId, "商家 #" + report.merchantId]);
+	if ((report.productId || 0) > 0) options.push(["PRODUCT", report.productId, "商品 #" + report.productId]);
+	if ((report.reviewId || 0) > 0) options.push(["REVIEW", report.reviewId, "评价 #" + report.reviewId]);
+	if (!options.length) options.push([report.targetRole, report.targetId, reportRoleText(report.targetRole) + " #" + report.targetId]);
+	return options.map(function(item) {
+		return '<option value="' + item[0] + ':' + item[1] + '">' + escapeHtml(item[2]) + '</option>';
+	}).join("");
 }
 
 function reportStatusText(status) {
@@ -2886,7 +2966,7 @@ function renderAdminReportModal() {
 	var options = statuses.map(function(status) {
 		return '<option value="' + status + '" ' + (report.status === status ? "selected" : "") + '>' + reportStatusText(status) + '</option>';
 	}).join("");
-	return '<div class="report-modal-backdrop"><form class="report-modal admin-report-modal" id="adminReportHandleForm"><div class="section-head"><div><h2>举报 #' + report.reportId + '</h2><p>' + escapeHtml(reportRoleText(report.targetRole) + " · " + (report.targetName || ("#" + report.targetId))) + '</p></div><button class="ghost-btn admin-report-modal-close" type="button">关闭</button></div><div class="report-detail-grid">' + renderReportDetailRows(report) + '</div><label class="field"><span>处理状态</span><select id="adminReportHandleStatus">' + options + '</select></label><label class="field wide"><span>处理意见</span><textarea id="adminReportHandleOpinion" rows="3" placeholder="写给举报人的处理意见">' + escapeHtml(report.handleOpinion || "") + '</textarea></label><label class="field wide"><span>处理结果</span><textarea id="adminReportHandleResult" rows="3" placeholder="记录平台最终处理结果">' + escapeHtml(report.handleResult || "") + '</textarea></label><div class="form-actions"><button class="ghost-btn admin-report-modal-close" type="button">取消</button><button class="primary-btn" type="submit">提交处理</button></div></form></div>';
+	return '<div class="report-modal-backdrop"><form class="report-modal admin-report-modal" id="adminReportHandleForm"><div class="section-head"><div><h2>举报 #' + report.reportId + '</h2><p>' + escapeHtml(reportRoleText(report.targetRole) + " · " + (report.targetName || ("#" + report.targetId))) + '</p></div><button class="ghost-btn admin-report-modal-close" type="button">关闭</button></div><div class="report-detail-grid">' + renderReportDetailRows(report) + '</div><div class="report-handle-grid"><label class="field"><span>处理状态</span><select id="adminReportHandleStatus">' + options + '</select></label><label class="field"><span>处理动作</span><select id="adminReportActionType">' + adminReportActions(report) + '</select></label><label class="field"><span>处罚对象</span><select id="adminReportPunishTarget">' + adminReportTargetOptions(report) + '</select></label><label class="field admin-report-duration-field hidden"><span>处罚天数</span><select id="adminReportDurationDays"><option value="1">1天</option><option value="3">3天</option><option value="7" selected>7天</option><option value="15">15天</option><option value="30">30天</option><option value="0">自定义</option></select></label><label class="field admin-report-custom-days hidden"><span>自定义天数</span><input id="adminReportCustomDays" type="number" min="1" max="3650" value="7"></label><label class="field wide"><span>处罚原因</span><input id="adminReportPunishReason" value="' + escapeHtml(report.reason || "") + '" placeholder="默认带入举报原因，可编辑"></label></div><label class="field wide"><span>处理意见</span><textarea id="adminReportHandleOpinion" rows="3" placeholder="写给举报人的处理意见">' + escapeHtml(report.handleOpinion || "") + '</textarea></label><label class="field wide"><span>处理结果</span><textarea id="adminReportHandleResult" rows="3" placeholder="记录平台最终处理结果">' + escapeHtml(report.handleResult || "") + '</textarea></label><div class="form-actions"><button class="ghost-btn admin-report-modal-close" type="button">取消</button><button class="primary-btn" type="submit">提交处理</button></div></form></div>';
 }
 
 function renderAdminReportPager() {
@@ -2920,11 +3000,12 @@ function renderAdminReports() {
 function renderReportModal() {
 	var modal = state.reportModal;
 	if (!modal) return "";
-	var label = reportRoleText(modal.targetRole) + " #" + modal.targetId;
-	var typeOptions = ["商品违规", "商家违规", "用户违规", "恶意评价", "订单纠纷", "其他"].map(function(item) {
+	var label = modal.title || (reportRoleText(modal.targetRole) + " #" + modal.targetId);
+	var allowedTypes = modal.allowedTypes || [modal.reportType || "其他"];
+	var typeOptions = allowedTypes.map(function(item) {
 		return '<option value="' + item + '" ' + (item === modal.reportType ? "selected" : "") + '>' + item + '</option>';
 	}).join("");
-	return '<div class="report-modal-backdrop"><form class="report-modal" id="reportForm"><div class="section-head"><div><h2>提交举报</h2><p>' + escapeHtml(label) + '</p></div><button class="ghost-btn report-modal-close" type="button">关闭</button></div><label class="field"><span>举报类型</span><select id="reportType">' + typeOptions + '</select></label><label class="field wide"><span>举报原因</span><input id="reportReason" placeholder="请简要说明举报原因"></label><label class="field wide"><span>详细说明</span><textarea id="reportDescription" rows="4" placeholder="补充时间、订单、沟通情况等信息"></textarea></label><label class="field wide"><span>证据链接/图片地址</span><input id="reportEvidenceUrls" placeholder="多个链接可用逗号分隔"></label><div class="form-actions"><button class="ghost-btn report-modal-close" type="button">取消</button><button class="primary-btn" type="submit">提交举报</button></div></form></div>';
+	return '<div class="report-modal-backdrop"><form class="report-modal" id="reportForm"><div class="section-head"><div><h2>提交举报</h2><p>' + escapeHtml(label) + '</p>' + (modal.desc ? '<small class="muted">' + escapeHtml(modal.desc) + '</small>' : '') + '</div><button class="ghost-btn report-modal-close" type="button">关闭</button></div><label class="field"><span>举报类型</span><select id="reportType">' + typeOptions + '</select></label><label class="field wide"><span>举报原因</span><input id="reportReason" placeholder="请简要说明举报原因"></label><label class="field wide"><span>详细说明</span><textarea id="reportDescription" rows="4" placeholder="补充时间、订单、沟通情况等信息"></textarea></label><label class="field wide"><span>证据链接/图片地址</span><input id="reportEvidenceUrls" placeholder="多个链接可用逗号分隔"></label><div class="form-actions"><button class="ghost-btn report-modal-close" type="button">取消</button><button class="primary-btn" type="submit">提交举报</button></div></form></div>';
 }
 
 function openReportModal(options) {
@@ -3303,12 +3384,31 @@ function scrollChatToBottom() {
 }
 
 function bindPageActions() {
+	Array.prototype.forEach.call(document.querySelectorAll(".more-menu-toggle"), function(btn) {
+		btn.onclick = function(e) {
+			e.stopPropagation();
+			var key = btn.getAttribute("data-menu") || "";
+			state.openMoreMenu = state.openMoreMenu === key ? "" : key;
+			renderPage();
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".more-menu-cancel"), function(btn) {
+		btn.onclick = function() {
+			state.openMoreMenu = "";
+			renderPage();
+		};
+	});
 	Array.prototype.forEach.call(document.querySelectorAll(".open-report"), function(btn) {
 		btn.onclick = function() {
+			state.openMoreMenu = "";
+			var reportType = btn.getAttribute("data-report-type") || "其他";
 			openReportModal({
 				targetRole: btn.getAttribute("data-target-role"),
 				targetId: Number(btn.getAttribute("data-target-id") || 0),
-				reportType: btn.getAttribute("data-report-type") || "其他",
+				reportType: reportType,
+				allowedTypes: [reportType],
+				title: btn.getAttribute("data-report-title") || "",
+				desc: btn.getAttribute("data-report-desc") || "",
 				merchantId: Number(btn.getAttribute("data-merchant-id") || 0),
 				orderId: Number(btn.getAttribute("data-order-id") || 0),
 				productId: Number(btn.getAttribute("data-product-id") || 0),
@@ -3397,12 +3497,40 @@ function bindPageActions() {
 	});
 	var adminReportHandleForm = document.getElementById("adminReportHandleForm");
 	if (adminReportHandleForm) {
+		var actionSelect = document.getElementById("adminReportActionType");
+		var targetSelect = document.getElementById("adminReportPunishTarget");
+		var durationSelect = document.getElementById("adminReportDurationDays");
+		var durationField = document.querySelector(".admin-report-duration-field");
+		var customDays = document.querySelector(".admin-report-custom-days");
+		var syncReportAction = function() {
+			var action = actionSelect ? actionSelect.value : "RECORD_ONLY";
+			var needsDays = ["FREEZE_USER", "DISABLE_USER", "FREEZE_MERCHANT", "DISABLE_MERCHANT"].indexOf(action) >= 0;
+			var preferredRole = action.indexOf("_USER") >= 0 ? "USER" : (action.indexOf("_MERCHANT") >= 0 ? "MERCHANT" : (action === "OFF_SALE_PRODUCT" ? "PRODUCT" : (action === "HIDE_REVIEW" ? "REVIEW" : "")));
+			if (preferredRole && targetSelect) {
+				Array.prototype.some.call(targetSelect.options, function(option) {
+					if (String(option.value).indexOf(preferredRole + ":") === 0) {
+						targetSelect.value = option.value;
+						return true;
+					}
+					return false;
+				});
+			}
+			if (durationField) durationField.classList.toggle("hidden", !needsDays);
+			if (customDays) customDays.classList.toggle("hidden", !needsDays || !durationSelect || durationSelect.value !== "0");
+		};
+		if (actionSelect) actionSelect.onchange = syncReportAction;
+		if (durationSelect) durationSelect.onchange = syncReportAction;
+		syncReportAction();
 		adminReportHandleForm.onsubmit = function(e) {
 			e.preventDefault();
 			var report = state.adminReportModal || {};
 			var status = document.getElementById("adminReportHandleStatus").value;
 			var opinion = document.getElementById("adminReportHandleOpinion").value.trim();
 			var result = document.getElementById("adminReportHandleResult").value.trim();
+			var actionType = document.getElementById("adminReportActionType").value;
+			var targetParts = document.getElementById("adminReportPunishTarget").value.split(":");
+			var durationValue = durationSelect ? durationSelect.value : "";
+			var durationDays = durationValue === "0" ? Number(document.getElementById("adminReportCustomDays").value || 0) : Number(durationValue || 0);
 			if (!opinion) {
 				alert("请填写处理意见");
 				return;
@@ -3413,6 +3541,11 @@ function bindPageActions() {
 				status: status,
 				handleOpinion: opinion,
 				handleResult: result,
+				actionType: actionType,
+				punishTargetRole: targetParts[0] || "",
+				punishTargetId: Number(targetParts[1] || 0),
+				durationDays: durationDays,
+				punishReason: document.getElementById("adminReportPunishReason").value,
 				filterStatus: state.adminReportStatusFilter || "all",
 				keyword: state.adminReportKeyword || "",
 				page: state.adminReportPage || 1,
@@ -3457,6 +3590,13 @@ function bindPageActions() {
 				sendChatCard("PRODUCT_CARD", productId);
 				setPage("messages");
 			});
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".share-product,.share-review"), function(btn) {
+		btn.onclick = function() {
+			state.openMoreMenu = "";
+			showToast(btn.classList.contains("share-review") ? "评价分享链接已生成" : "商品分享链接已生成");
+			renderPage();
 		};
 	});
 	Array.prototype.forEach.call(document.querySelectorAll(".view-detail,.visual-open"), function(btn) {
@@ -3973,6 +4113,21 @@ function bindPageActions() {
 				sendChatCard("ORDER_CARD", orderId);
 				setPage("messages");
 			});
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".order-contact-user"), function(btn) {
+		btn.onclick = function() {
+			state.openMoreMenu = "";
+			showToast("可在消息中心查看与用户 #" + btn.getAttribute("data-user") + " 的沟通");
+			renderPage();
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".merchant-order-detail"), function(btn) {
+		btn.onclick = function() {
+			var id = Number(btn.getAttribute("data-id") || 0);
+			var order = (state.merchantOrders || []).filter(function(item) { return Number(item.id) === id; })[0];
+			if (!order) return;
+			alert("订单：" + order.orderNo + "\n状态：" + order.status + "\n金额：" + money(order.totalAmount) + "\n收货人：" + (order.receiverName || ""));
 		};
 	});
 	Array.prototype.forEach.call(document.querySelectorAll(".apply-after-sale"), function(btn) {

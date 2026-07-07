@@ -51,6 +51,7 @@ public class BusinessService {
     public void likeReview(int reviewId, String actorType, int actorId) { dao.likeReview(reviewId, actorType, actorId); }
     public java.util.Map<String, Object> toggleReviewLike(int reviewId, String actorType, int actorId) { return dao.toggleReviewLike(reviewId, actorType, actorId); }
     public void replyReview(int reviewId, String actorType, int actorId, String actorName, String actorAvatar, String content) { dao.replyReview(reviewId, actorType, actorId, actorName, actorAvatar, content); }
+    public int[] hideReview(int reviewId) { return dao.hideReview(reviewId); }
     public java.util.Map<String, Object> reviewStatsForUser(int userId) { return dao.reviewStatsForUser(userId); }
     public java.util.Map<String, Object> reviewStatsForProduct(int productId) { return dao.reviewStatsForProduct(productId); }
     public int saveReviewMedia(String ownerType, int ownerId, int productId, String mediaType, String mediaUrl, String fileName, long fileSize) { return dao.saveReviewMedia(ownerType, ownerId, productId, mediaType, mediaUrl, fileName, fileSize); }

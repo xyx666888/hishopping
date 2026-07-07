@@ -183,6 +183,60 @@ public class MerchantDao {
         }
     }
 
+    public void applyPunishment(int merchantId, String status, String reason, Integer durationDays, boolean offSaleProducts) {
+        String sql = durationDays == null
+            ? "update hishop_merchant set status=?, reject_reason=?, punish_reason=?, punish_start_time=sysdatetime(), punish_end_time=null, update_time=sysdatetime() where merchant_id=?"
+            : "update hishop_merchant set status=?, reject_reason=?, punish_reason=?, punish_start_time=sysdatetime(), punish_end_time=dateadd(day, ?, sysdatetime()), update_time=sysdatetime() where merchant_id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        PreparedStatement productPs = null;
+        try {
+            conn = DBUtil.getConn();
+            conn.setAutoCommit(false);
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, status);
+            ps.setString(2, reason);
+            ps.setString(3, reason);
+            if (durationDays == null) {
+                ps.setInt(4, merchantId);
+            } else {
+                ps.setInt(4, durationDays.intValue());
+                ps.setInt(5, merchantId);
+            }
+            if (ps.executeUpdate() == 0) throw new RuntimeException("商家不存在。");
+            if (offSaleProducts) {
+                productPs = conn.prepareStatement("update hishopping_product set sale_status=N'OFF_SALE' where merchant_id=?");
+                productPs.setInt(1, merchantId);
+                productPs.executeUpdate();
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            if (conn != null) {
+                try { conn.rollback(); } catch (SQLException ignored) {}
+            }
+            throw new RuntimeException(e);
+        } finally {
+            try { if (productPs != null) productPs.close(); } catch (SQLException ignored) {}
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void restorePunishmentIfExpired(int merchantId) {
+        String sql = "update hishop_merchant set status=N'APPROVED', reject_reason=null, punish_reason=null, punish_start_time=null, punish_end_time=null, update_time=sysdatetime() where merchant_id=? and status in (N'FROZEN',N'DISABLED') and punish_end_time is not null and punish_end_time<=sysdatetime()";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, merchantId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
     public void updateProfile(Merchant merchant) {
         String sql = "update hishop_merchant set merchant_name=?, password=?, register_password_demo=?, contact_phone=?, email=?, shop_name=?, shop_desc=?, business_category=?, business_address=?, update_time=sysdatetime() where merchant_id=?";
         Connection conn = null;
@@ -255,6 +309,9 @@ public class MerchantDao {
             st.executeUpdate("if col_length('dbo.hishopping_product','review_time') is null alter table dbo.hishopping_product add review_time datetime2 null");
             st.executeUpdate("if col_length('dbo.hishopping_product','review_admin_id') is null alter table dbo.hishopping_product add review_admin_id int null");
             st.executeUpdate("if col_length('dbo.hishop_merchant','avatar_url') is null alter table dbo.hishop_merchant add avatar_url nvarchar(300) null");
+            st.executeUpdate("if col_length('dbo.hishop_merchant','punish_reason') is null alter table dbo.hishop_merchant add punish_reason nvarchar(500) null");
+            st.executeUpdate("if col_length('dbo.hishop_merchant','punish_start_time') is null alter table dbo.hishop_merchant add punish_start_time datetime2 null");
+            st.executeUpdate("if col_length('dbo.hishop_merchant','punish_end_time') is null alter table dbo.hishop_merchant add punish_end_time datetime2 null");
             st.executeUpdate("if col_length('dbo.hishopping_product','sku_options') is null alter table dbo.hishopping_product add sku_options nvarchar(max) null");
             st.executeUpdate("if col_length('dbo.hishopping_product','sku_attrs') is null alter table dbo.hishopping_product add sku_attrs nvarchar(max) null");
             st.executeUpdate("if col_length('dbo.hishopping_cart_item','selected_color') is null alter table dbo.hishopping_cart_item add selected_color nvarchar(50) null");
@@ -310,10 +367,31 @@ public class MerchantDao {
         m.setStatus(rs.getString("status"));
         m.setAvatarUrl(rs.getString("avatar_url"));
         m.setRejectReason(rs.getString("reject_reason"));
+        m.setPunishReason(getString(rs, "punish_reason"));
+        m.setPunishStartTime(time(rs, "punish_start_time"));
+        m.setPunishEndTime(time(rs, "punish_end_time"));
         m.setCreateTime(String.valueOf(rs.getTimestamp("create_time")));
         m.setUpdateTime(String.valueOf(rs.getTimestamp("update_time")));
         m.setReviewTime(rs.getTimestamp("review_time") == null ? "" : String.valueOf(rs.getTimestamp("review_time")));
         m.setReviewAdminId(rs.getInt("review_admin_id"));
         return m;
+    }
+
+    private String getString(ResultSet rs, String column) {
+        try {
+            Object value = rs.getObject(column);
+            return value == null ? "" : String.valueOf(value);
+        } catch (SQLException e) {
+            return "";
+        }
+    }
+
+    private String time(ResultSet rs, String column) {
+        try {
+            java.sql.Timestamp value = rs.getTimestamp(column);
+            return value == null ? "" : String.valueOf(value);
+        } catch (SQLException e) {
+            return "";
+        }
     }
 }

@@ -5,6 +5,7 @@ import java.util.Random;
 import java.util.regex.Pattern;
 
 import hishopping.dao.UserDao;
+import hishopping.dao.ReportDao;
 import hishopping.entity.Admin;
 import hishopping.entity.User;
 
@@ -15,6 +16,7 @@ public class UserService {
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private UserDao userDao = new UserDao();
+    private ReportDao reportDao = new ReportDao();
     private Random random = new Random();
     private CouponService couponService = new CouponService();
 
@@ -22,7 +24,24 @@ public class UserService {
         if (empty(account) || empty(password)) {
             return null;
         }
-        return userDao.findByLoginAndPassword(account.trim(), password.trim());
+        User user = userDao.findAnyByLoginAndPassword(account.trim(), password.trim());
+        if (user == null) return null;
+        if (isTemporaryBlocked(user.getStatus()) && expired(user.getPunishEndTime())) {
+            userDao.restorePunishmentIfExpired(user.getId());
+            reportDao.expirePunishments("USER", user.getId());
+            return userDao.findById(user.getId());
+        }
+        if ("冻结".equals(user.getStatus())) {
+            throw new RuntimeException("账号已被冻结，预计恢复时间：" + safeTime(user.getPunishEndTime()) + "。冻结原因：" + safeReason(user.getPunishReason()));
+        }
+        if ("停用".equals(user.getStatus())) {
+            throw new RuntimeException("账号已被停用，预计恢复时间：" + safeTime(user.getPunishEndTime()) + "。停用原因：" + safeReason(user.getPunishReason()));
+        }
+        if ("封禁".equals(user.getStatus())) {
+            throw new RuntimeException("账号已被封禁。封禁原因：" + safeReason(user.getPunishReason()));
+        }
+        if (DELETED_STATUS.equals(user.getStatus())) return null;
+        return user;
     }
 
     public Admin adminLogin(String adminName, String password) {
@@ -134,6 +153,13 @@ public class UserService {
         userDao.updateStatus(id, "\u6b63\u5e38");
     }
 
+    public void punishUser(int userId, String status, String reason, Integer durationDays) {
+        if (userId <= 0) throw new RuntimeException("请选择用户。");
+        if (!"冻结".equals(status) && !"停用".equals(status) && !"封禁".equals(status)) throw new RuntimeException("用户处罚状态不正确。");
+        if (!"封禁".equals(status) && (durationDays == null || durationDays.intValue() <= 0)) throw new RuntimeException("冻结/停用用户需要填写处罚天数。");
+        userDao.applyPunishment(userId, status, reason, "封禁".equals(status) ? null : durationDays);
+    }
+
     private String generateUniqueAccountId() {
         for (int i = 0; i < MAX_ACCOUNT_ID_RETRY; i++) {
             String accountId = randomAccountId();
@@ -164,5 +190,27 @@ public class UserService {
 
     private boolean validMainlandPhone(String phone) {
         return phone != null && MAINLAND_PHONE_PATTERN.matcher(phone).matches();
+    }
+
+    private boolean isTemporaryBlocked(String status) {
+        return "冻结".equals(status) || "停用".equals(status);
+    }
+
+    private boolean expired(String time) {
+        if (empty(time)) return false;
+        try {
+            java.sql.Timestamp ts = java.sql.Timestamp.valueOf(time.substring(0, Math.min(19, time.length())));
+            return ts.getTime() <= System.currentTimeMillis();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String safeTime(String value) {
+        return empty(value) ? "未知" : value.substring(0, Math.min(19, value.length()));
+    }
+
+    private String safeReason(String value) {
+        return empty(value) ? "平台风控处理" : value;
     }
 }

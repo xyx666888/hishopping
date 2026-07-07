@@ -342,6 +342,26 @@ public class ProductDao {
         }
     }
 
+    public int adminOffSale(int productId, String opinion, int adminId) {
+        String sql = "update hishopping_product set sale_status=N'OFF_SALE', audit_opinion=?, review_admin_id=?, review_time=sysdatetime() where id=?";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, opinion);
+            ps.setInt(2, adminId);
+            ps.setInt(3, productId);
+            if (ps.executeUpdate() == 0) throw new RuntimeException("商品不存在。");
+            Product p = findById(productId);
+            return p == null ? 0 : p.getMerchantId();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
     public void changeStatus(int id, String status) {
         String sql = "update hishopping_product set status=? where id=?";
         Connection conn = null;

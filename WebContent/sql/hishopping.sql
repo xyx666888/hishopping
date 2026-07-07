@@ -421,8 +421,20 @@ IF COL_LENGTH('dbo.hishopping_order', 'discount_amount') IS NULL
     ALTER TABLE dbo.hishopping_order ADD discount_amount DECIMAL(10,2) NOT NULL CONSTRAINT DF_hishopping_order_discount_amount DEFAULT 0;
 IF COL_LENGTH('dbo.hishopping_user', 'avatar_url') IS NULL
     ALTER TABLE dbo.hishopping_user ADD avatar_url NVARCHAR(300) NULL;
+IF COL_LENGTH('dbo.hishopping_user', 'punish_reason') IS NULL
+    ALTER TABLE dbo.hishopping_user ADD punish_reason NVARCHAR(500) NULL;
+IF COL_LENGTH('dbo.hishopping_user', 'punish_start_time') IS NULL
+    ALTER TABLE dbo.hishopping_user ADD punish_start_time DATETIME2 NULL;
+IF COL_LENGTH('dbo.hishopping_user', 'punish_end_time') IS NULL
+    ALTER TABLE dbo.hishopping_user ADD punish_end_time DATETIME2 NULL;
 IF COL_LENGTH('dbo.hishop_merchant', 'avatar_url') IS NULL
     ALTER TABLE dbo.hishop_merchant ADD avatar_url NVARCHAR(300) NULL;
+IF COL_LENGTH('dbo.hishop_merchant', 'punish_reason') IS NULL
+    ALTER TABLE dbo.hishop_merchant ADD punish_reason NVARCHAR(500) NULL;
+IF COL_LENGTH('dbo.hishop_merchant', 'punish_start_time') IS NULL
+    ALTER TABLE dbo.hishop_merchant ADD punish_start_time DATETIME2 NULL;
+IF COL_LENGTH('dbo.hishop_merchant', 'punish_end_time') IS NULL
+    ALTER TABLE dbo.hishop_merchant ADD punish_end_time DATETIME2 NULL;
 IF COL_LENGTH('dbo.hishopping_message', 'conversation_id') IS NULL
     ALTER TABLE dbo.hishopping_message ADD conversation_id INT NULL;
 IF COL_LENGTH('dbo.hishopping_message', 'content_type') IS NULL
@@ -958,6 +970,32 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_user' A
     EXEC(N'CREATE INDEX IX_hishop_report_user ON dbo.hishop_report(user_id, create_time DESC);');
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_report_order' AND object_id = OBJECT_ID(N'dbo.hishop_report'))
     EXEC(N'CREATE INDEX IX_hishop_report_order ON dbo.hishop_report(order_id, create_time DESC);');
+GO
+
+IF OBJECT_ID(N'dbo.hishop_punishment', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.hishop_punishment (
+        punishment_id INT IDENTITY(1,1) PRIMARY KEY,
+        report_id INT NULL,
+        target_role NVARCHAR(20) NOT NULL,
+        target_id INT NOT NULL,
+        action_type NVARCHAR(50) NOT NULL,
+        duration_days INT NULL,
+        start_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_punishment_start DEFAULT SYSDATETIME(),
+        end_time DATETIME2 NULL,
+        reason NVARCHAR(500) NULL,
+        status NVARCHAR(20) NOT NULL CONSTRAINT DF_hishop_punishment_status DEFAULT N'ACTIVE',
+        admin_id INT NULL,
+        admin_name NVARCHAR(100) NULL,
+        create_time DATETIME2 NOT NULL CONSTRAINT DF_hishop_punishment_create DEFAULT SYSDATETIME()
+    );
+END
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_punishment_target' AND object_id = OBJECT_ID(N'dbo.hishop_punishment'))
+    EXEC(N'CREATE INDEX IX_hishop_punishment_target ON dbo.hishop_punishment(target_role, target_id, status, end_time);');
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishop_punishment_report' AND object_id = OBJECT_ID(N'dbo.hishop_punishment'))
+    EXEC(N'CREATE INDEX IX_hishop_punishment_report ON dbo.hishop_punishment(report_id, create_time DESC);');
 GO
 
 IF NOT EXISTS (SELECT 1 FROM dbo.hishop_report WHERE reason = N'演示举报记录')

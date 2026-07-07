@@ -6067,6 +6067,88 @@ img.product-media-main {
     min-width: 180px;
 }
 
+.more-menu-wrap {
+    position: relative;
+    display: inline-flex;
+    justify-content: flex-end;
+    vertical-align: middle;
+}
+
+.more-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0 0 2px;
+    border: 1px solid var(--slate-200);
+    border-radius: 50%;
+    background: #fff;
+    color: var(--slate-700);
+    font-weight: 800;
+    font-size: 17px;
+    line-height: 0;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, .06);
+}
+
+.more-menu-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 35;
+    min-width: 156px;
+    padding: 8px;
+    border: 1px solid var(--slate-200);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 18px 46px rgba(15, 23, 42, .16);
+}
+
+.more-menu-item {
+    display: block;
+    width: 100%;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    padding: 10px 12px;
+    color: var(--slate-700);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.more-menu-item:hover {
+    background: var(--slate-100);
+}
+
+.more-menu-item.disabled {
+    color: var(--slate-400);
+    pointer-events: none;
+}
+
+.more-menu-cancel {
+    color: var(--slate-500);
+}
+
+.detail-more-actions,
+.merchant-row-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.report-handle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.report-handle-grid .wide {
+    grid-column: 1 / -1;
+}
+
 .report-split {
     display: grid;
     gap: 18px;
@@ -6151,6 +6233,25 @@ img.product-media-main {
 }
 
 @media (max-width: 720px) {
+    .more-menu-wrap.open::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 34;
+        background: rgba(15, 23, 42, .22);
+    }
+    .more-menu-panel {
+        position: fixed;
+        left: 12px;
+        right: 12px;
+        top: auto;
+        bottom: 14px;
+        min-width: 0;
+        border-radius: 18px;
+    }
+    .report-handle-grid {
+        grid-template-columns: 1fr;
+    }
     .report-table {
         overflow-x: auto;
     }

@@ -149,6 +149,55 @@ public class ReportDao {
         }
     }
 
+    public void createPunishment(int reportId, String targetRole, int targetId, String actionType, Integer durationDays, String reason, int adminId, String adminName) {
+        String sql = durationDays == null
+            ? "insert into hishop_punishment(report_id,target_role,target_id,action_type,duration_days,start_time,end_time,reason,status,admin_id,admin_name) values(?,?,?,?,null,sysdatetime(),null,?,N'ACTIVE',?,?)"
+            : "insert into hishop_punishment(report_id,target_role,target_id,action_type,duration_days,start_time,end_time,reason,status,admin_id,admin_name) values(?,?,?,?,?,sysdatetime(),dateadd(day,?,sysdatetime()),?,N'ACTIVE',?,?)";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setInt(1, reportId);
+            ps.setString(2, targetRole);
+            ps.setInt(3, targetId);
+            ps.setString(4, actionType);
+            if (durationDays == null) {
+                ps.setString(5, reason);
+                ps.setInt(6, adminId);
+                ps.setString(7, adminName);
+            } else {
+                ps.setInt(5, durationDays.intValue());
+                ps.setInt(6, durationDays.intValue());
+                ps.setString(7, reason);
+                ps.setInt(8, adminId);
+                ps.setString(9, adminName);
+            }
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
+    public void expirePunishments(String targetRole, int targetId) {
+        String sql = "update hishop_punishment set status=N'EXPIRED' where target_role=? and target_id=? and status=N'ACTIVE' and end_time is not null and end_time<=sysdatetime()";
+        Connection conn = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            ps = conn.prepareStatement(sql);
+            ps.setString(1, targetRole);
+            ps.setInt(2, targetId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, conn);
+        }
+    }
+
     private List<Report> query(String sql, Object... params) {
         List<Report> list = new ArrayList<Report>();
         Connection conn = null;
@@ -318,6 +367,9 @@ public class ReportDao {
             st.executeUpdate("if col_length('dbo.hishop_report','create_time') is null alter table dbo.hishop_report add create_time datetime2 not null constraint DF_hishop_report_create_time_java default sysdatetime()");
             st.executeUpdate("if col_length('dbo.hishop_report','update_time') is null alter table dbo.hishop_report add update_time datetime2 not null constraint DF_hishop_report_update_time_java default sysdatetime()");
             st.executeUpdate("if col_length('dbo.hishop_report','handle_time') is null alter table dbo.hishop_report add handle_time datetime2 null");
+            st.executeUpdate("if object_id(N'dbo.hishop_punishment', N'U') is null create table dbo.hishop_punishment(punishment_id int identity(1,1) primary key, report_id int null, target_role nvarchar(20) not null, target_id int not null, action_type nvarchar(50) not null, duration_days int null, start_time datetime2 not null default sysdatetime(), end_time datetime2 null, reason nvarchar(500) null, status nvarchar(20) not null default N'ACTIVE', admin_id int null, admin_name nvarchar(100) null, create_time datetime2 not null default sysdatetime())");
+            st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_punishment_target' and object_id=object_id(N'dbo.hishop_punishment')) create index IX_hishop_punishment_target on dbo.hishop_punishment(target_role,target_id,status,end_time)");
+            st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_punishment_report' and object_id=object_id(N'dbo.hishop_punishment')) create index IX_hishop_punishment_report on dbo.hishop_punishment(report_id,create_time desc)");
             st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_report_status_time' and object_id=object_id(N'dbo.hishop_report')) create index IX_hishop_report_status_time on dbo.hishop_report(status, create_time desc)");
             st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_report_reporter' and object_id=object_id(N'dbo.hishop_report')) create index IX_hishop_report_reporter on dbo.hishop_report(reporter_role, reporter_id, create_time desc)");
             st.executeUpdate("if not exists(select 1 from sys.indexes where name=N'IX_hishop_report_target' and object_id=object_id(N'dbo.hishop_report')) create index IX_hishop_report_target on dbo.hishop_report(target_role, target_id)");

@@ -52,7 +52,22 @@ public class AdminReportServlet extends HttpServlet {
         }
         try {
             String adminName = admin.getRealName() == null || admin.getRealName().length() == 0 ? admin.getAdminName() : admin.getRealName();
-            Report report = service.handle(ServletUtil.intParam(request, "reportId", 0), upper(request.getParameter("status")), admin.getId(), adminName, request.getParameter("handleOpinion"), request.getParameter("handleResult"));
+            Integer durationDays = null;
+            int rawDays = ServletUtil.intParam(request, "durationDays", 0);
+            if (rawDays > 0) durationDays = Integer.valueOf(rawDays);
+            Report report = service.handle(
+                ServletUtil.intParam(request, "reportId", 0),
+                upper(request.getParameter("status")),
+                admin.getId(),
+                adminName,
+                request.getParameter("handleOpinion"),
+                request.getParameter("handleResult"),
+                upper(request.getParameter("actionType")),
+                upper(request.getParameter("punishTargetRole")),
+                ServletUtil.intParam(request, "punishTargetId", 0),
+                durationDays,
+                request.getParameter("punishReason")
+            );
             String filterStatus = request.getParameter("filterStatus");
             String keyword = request.getParameter("keyword");
             int page = ServletUtil.intParam(request, "page", 1);

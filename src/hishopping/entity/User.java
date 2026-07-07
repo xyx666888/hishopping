@@ -13,6 +13,9 @@ public class User {
     private int growthValue;
     private String status;
     private String avatarUrl;
+    private String punishReason;
+    private String punishStartTime;
+    private String punishEndTime;
     private String createTime;
 
     public int getId() { return id; }
@@ -39,6 +42,12 @@ public class User {
     public void setStatus(String status) { this.status = status; }
     public String getAvatarUrl() { return avatarUrl; }
     public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public String getPunishReason() { return punishReason; }
+    public void setPunishReason(String punishReason) { this.punishReason = punishReason; }
+    public String getPunishStartTime() { return punishStartTime; }
+    public void setPunishStartTime(String punishStartTime) { this.punishStartTime = punishStartTime; }
+    public String getPunishEndTime() { return punishEndTime; }
+    public void setPunishEndTime(String punishEndTime) { this.punishEndTime = punishEndTime; }
     public String getCreateTime() { return createTime; }
     public void setCreateTime(String createTime) { this.createTime = createTime; }
 }
