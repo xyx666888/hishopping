@@ -9,6 +9,7 @@ var state = {
 	categories: [],
 	selectedProduct: null,
 	detailReturnPage: "home",
+	detailReturnScroll: null,
 	selectedCategoryId: "all",
 	activeFeed: "recommend",
 	selectedColor: "",
@@ -1853,6 +1854,8 @@ function addToCart(productId, goCart, quantity) {
 }
 
 function openDetail(productId, sourcePage) {
+	var root = document.getElementById("pageRoot");
+	if (state.page !== "detail") state.detailReturnScroll = captureScrollState(root);
 	return get("productDetail?id=" + encodeURIComponent(productId)).then(function(data) {
 		if (data.success) {
 			state.detailReturnPage = sourcePage || (state.page === "detail" ? state.detailReturnPage : state.page) || "home";
@@ -4403,7 +4406,18 @@ function bindPageActions() {
 	var detailBack = document.querySelector(".detail-back-btn");
 	if (detailBack) {
 		detailBack.onclick = function() {
-			setPage(state.detailReturnPage || "home");
+			var returnPage = state.detailReturnPage || "home";
+			var returnScroll = state.detailReturnScroll;
+			setPage(returnPage);
+			if (returnScroll) {
+				setTimeout(function() {
+					restoreScrollState(document.getElementById("pageRoot"), returnScroll);
+					state.detailReturnScroll = null;
+				}, 80);
+				setTimeout(function() {
+					restoreScrollState(document.getElementById("pageRoot"), returnScroll);
+				}, 220);
+			}
 		};
 	}
 	var hall = document.querySelector(".hall-carousel");
