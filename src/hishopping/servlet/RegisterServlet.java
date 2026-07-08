@@ -7,6 +7,7 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import hishopping.entity.User;
 import hishopping.service.BusinessService;
@@ -47,6 +48,7 @@ public class RegisterServlet extends HttpServlet {
             }
             User user = userService.register(request.getParameter("username"), request.getParameter("email"), request.getParameter("phone"), request.getParameter("password"));
             businessService.recordRegistrationGrowth(user.getId());
+            setActiveUser(request);
             request.getSession().setAttribute("user", user);
             result = ServletUtil.ok();
             result.put("user", ServletUtil.user(user));
@@ -58,6 +60,13 @@ public class RegisterServlet extends HttpServlet {
 
     private boolean isEmpty(String value) {
         return value == null || value.trim().length() == 0;
+    }
+
+    private void setActiveUser(HttpServletRequest request) {
+        HttpSession session = request.getSession();
+        session.removeAttribute("admin");
+        session.removeAttribute("merchant");
+        session.setAttribute("authType", "user");
     }
 }
 

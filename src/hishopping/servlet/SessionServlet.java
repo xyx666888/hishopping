@@ -29,6 +29,36 @@ public class SessionServlet extends HttpServlet {
             User user = ServletUtil.currentUser(request);
             Admin admin = ServletUtil.currentAdmin(request);
             Merchant merchant = ServletUtil.currentMerchant(request);
+            String authType = String.valueOf(request.getSession(false) == null ? "" : request.getSession(false).getAttribute("authType"));
+            if ("admin".equals(authType) && admin != null) {
+                result = ServletUtil.ok();
+                result.put("type", "admin");
+                result.put("admin", ServletUtil.admin(admin));
+                JsonUtil.write(response, result);
+                return;
+            }
+            if ("merchant".equals(authType) && merchant != null) {
+                Merchant refreshedMerchant = merchantService.findById(merchant.getMerchantId());
+                if (refreshedMerchant != null && "APPROVED".equals(refreshedMerchant.getStatus())) {
+                    request.getSession().setAttribute("merchant", refreshedMerchant);
+                    result = ServletUtil.ok();
+                    result.put("type", "merchant");
+                    result.put("merchant", ServletUtil.merchant(refreshedMerchant));
+                    JsonUtil.write(response, result);
+                    return;
+                }
+            }
+            if ("user".equals(authType) && user != null) {
+                User refreshedUser = userService.findById(user.getId());
+                if (refreshedUser != null) {
+                    request.getSession().setAttribute("user", refreshedUser);
+                    result = ServletUtil.ok();
+                    result.put("type", "user");
+                    result.put("user", ServletUtil.user(refreshedUser));
+                    JsonUtil.write(response, result);
+                    return;
+                }
+            }
             if (user != null) {
                 User refreshedUser = userService.findById(user.getId());
                 if (refreshedUser != null) {

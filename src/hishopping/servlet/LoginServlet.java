@@ -8,6 +8,7 @@ import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import hishopping.entity.Admin;
 import hishopping.entity.Merchant;
@@ -40,6 +41,7 @@ public class LoginServlet extends HttpServlet {
             } else if ("merchant".equals(mode)) {
                 MerchantService merchantService = new MerchantService();
                 Merchant merchant = merchantService.login(account, password);
+                setActiveIdentity(request, "merchant");
                 request.getSession().setAttribute("merchant", merchant);
                 result = ServletUtil.ok();
                 result.put("type", "merchant");
@@ -49,6 +51,7 @@ public class LoginServlet extends HttpServlet {
                 if (admin == null) {
                     result = ServletUtil.fail("\u7ba1\u7406\u5458\u8d26\u53f7\u6216\u5bc6\u7801\u9519\u8bef\u3002");
                 } else {
+                    setActiveIdentity(request, "admin");
                     request.getSession().setAttribute("admin", admin);
                     result = ServletUtil.ok();
                     result.put("type", "admin");
@@ -59,6 +62,7 @@ public class LoginServlet extends HttpServlet {
                 if (user == null) {
                     result = ServletUtil.fail("\u7528\u6237ID\u3001\u90ae\u7bb1\u3001\u624b\u673a\u53f7\u6216\u5bc6\u7801\u9519\u8bef\u3002");
                 } else {
+                    setActiveIdentity(request, "user");
                     request.getSession().setAttribute("user", user);
                     result = ServletUtil.ok();
                     result.put("type", "user");
@@ -84,5 +88,13 @@ public class LoginServlet extends HttpServlet {
 
     private boolean isEmpty(String value) {
         return value == null || value.trim().length() == 0;
+    }
+
+    private void setActiveIdentity(HttpServletRequest request, String type) {
+        HttpSession session = request.getSession();
+        session.removeAttribute("user");
+        session.removeAttribute("admin");
+        session.removeAttribute("merchant");
+        session.setAttribute("authType", type);
     }
 }

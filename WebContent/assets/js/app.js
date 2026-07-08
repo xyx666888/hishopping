@@ -202,6 +202,70 @@ var orderRefreshTimer = null;
 var toastTimer = null;
 var lastRenderedPage = "";
 
+function resetAuthenticatedState() {
+	state.user = null;
+	state.admin = null;
+	state.merchant = null;
+	state.page = "home";
+	state.cart = [];
+	state.selectedCartItemIds = {};
+	state.orders = [];
+	state.adminOrders = [];
+	state.adminUsers = [];
+	state.adminAddresses = [];
+	state.adminUserCoupons = [];
+	state.merchants = [];
+	state.merchantProducts = [];
+	state.merchantEditingProductId = null;
+	state.merchantOrders = [];
+	state.merchantCoupons = [];
+	state.merchantCouponUsers = [];
+	state.adminAuditProducts = [];
+	state.couponTemplates = [];
+	state.userCoupons = [];
+	state.favoriteIds = [];
+	state.favorites = [];
+	state.couponLogs = [];
+	state.addresses = [];
+	state.selectedAddressId = null;
+	state.messages = [];
+	state.conversations = [];
+	state.activeConversationId = null;
+	state.messageTargets = [];
+	state.friendSearchResults = [];
+	state.friendRequests = [];
+	state.unreadMessages = 0;
+	state.accountRequests = [];
+	state.afterSales = [];
+	state.growthLogs = [];
+	state.adminLogs = [];
+	state.reports = [];
+	state.merchantMyReports = [];
+	state.merchantRelatedReports = [];
+	state.adminReports = [];
+	state.adminReportTotal = 0;
+	state.merchantAnalytics = null;
+	state.adminAnalytics = null;
+	state.adminAnalyticsError = "";
+	state.selectedCouponId = null;
+	state.selectedPlatformCouponId = null;
+	state.selectedStackableCouponId = null;
+	state.selectedMerchantCouponId = null;
+	state.settingsPanel = "";
+	state.merchantSettingsPanel = "";
+	state.openMoreMenu = "";
+	lastRenderedPage = "";
+}
+
+function showAppLoading() {
+	var root = document.getElementById("pageRoot");
+	var nav = document.getElementById("sideNav");
+	var title = document.getElementById("pageTitle");
+	if (root) root.innerHTML = '<div class="empty-cart"><h3>Loading...</h3><p class="muted">Preparing your workspace.</p></div>';
+	if (nav) nav.innerHTML = "";
+	if (title) title.textContent = "Loading";
+}
+
 function scrollableElements(root) {
 	if (!root) return [];
 	return Array.prototype.filter.call(root.querySelectorAll("*"), function(el) {
@@ -6395,12 +6459,14 @@ function afterAuth(data, restored) {
 		showMessage(data.message || "操作失败");
 		return;
 	}
+	resetAuthenticatedState();
 	state.user = data.user || null;
 	state.admin = data.admin || null;
 	state.merchant = data.merchant || null;
 	applyCouponState();
 	document.getElementById("authPage").classList.add("hidden");
 	document.getElementById("appPage").classList.remove("hidden");
+	showAppLoading();
 	updateShellForRole();
 	Promise.all([loadProducts(), loadHallBanners(false)]).then(function() {
 		return Promise.all([loadCart(), loadOrders(), loadAddresses(), loadUserCoupons(), loadFavorites(), loadMessages()]);
@@ -6430,37 +6496,16 @@ function restoreSession() {
 
 document.getElementById("logoutBtn").onclick = function() {
 	post("logout", {}).then(function() {
-		state.user = null;
-		state.admin = null;
-		state.merchant = null;
-		state.cart = [];
-		state.selectedCartItemIds = {};
-		state.orders = [];
-		state.adminOrders = [];
-		state.adminUsers = [];
-		state.adminAddresses = [];
-		state.adminUserCoupons = [];
-		state.merchants = [];
-		state.merchantProducts = [];
-		state.merchantOrders = [];
-		state.merchantCoupons = [];
-		state.merchantCouponUsers = [];
-		state.adminAuditProducts = [];
-		state.couponTemplates = [];
-		state.userCoupons = [];
-		state.favoriteIds = [];
-		state.favorites = [];
-		state.couponLogs = [];
-		state.addresses = [];
-		state.selectedAddressId = null;
+		resetAuthenticatedState();
 		applyCouponState();
-		state.selectedCouponId = null;
 		try {
 			sessionStorage.removeItem("hishoppingPage");
+			sessionStorage.removeItem("hishoppingMerchantEditProductId");
 		} catch (e) {
 		}
 		updateCouponBadge();
 		updateOrderRefresh();
+		showAppLoading();
 		document.getElementById("appPage").classList.add("hidden");
 		document.getElementById("authPage").classList.remove("hidden");
 		updateShellForRole();
