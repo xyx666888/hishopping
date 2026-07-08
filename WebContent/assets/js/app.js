@@ -2681,6 +2681,14 @@ function analyticsProductName(product) {
 	return mapValue(product, "productName") || mapValue(product, "name") || "未命名商品";
 }
 
+function analyticsProductThumb(product) {
+	return productThumb({
+		imageUrl: mapValue(product, "imageUrl"),
+		gradient: mapValue(product, "gradient") || "linear-gradient(135deg,#8b5cf6,#4f46e5)",
+		iconText: mapValue(product, "iconText") || "品"
+	}, "analytics-product-thumb");
+}
+
 function analyticsProducts(data) {
 	return (data && data.products) || [];
 }
@@ -2706,8 +2714,8 @@ function renderAnalyticsCards(summary, cards) {
 function renderProductAnalyticsRows(products) {
 	return (products || []).map(function(p) {
 		var id = analyticsProductId(p);
-		return '<tr><td>' + escapeHtml(id) + '</td><td><b>' + escapeHtml(analyticsProductName(p)) + '</b><p class="muted">' + escapeHtml(mapValue(p, "categoryName") || mapValue(p, "shopName")) + '</p></td><td>' + money(mapValue(p, "price")) + '</td><td>' + escapeHtml(mapValue(p, "stock")) + '</td><td>' + escapeHtml(mapValue(p, "sales")) + '</td><td>' + Number(mapValue(p, "averageRating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(p, "reviewCount") || 0) + '</td><td>' + escapeHtml(mapValue(p, "favoriteCount") || 0) + '</td><td><button class="ghost-btn analytics-product-detail" data-id="' + escapeHtml(id) + '" type="button">查看详情</button></td></tr>';
-	}).join("") || '<tr><td colspan="9">暂无商品分析数据。</td></tr>';
+		return '<tr><td>' + escapeHtml(id) + '</td><td>' + analyticsProductThumb(p) + '</td><td><b>' + escapeHtml(analyticsProductName(p)) + '</b><p class="muted">' + escapeHtml(mapValue(p, "categoryName") || mapValue(p, "shopName")) + '</p></td><td>' + money(mapValue(p, "price")) + '</td><td>' + escapeHtml(mapValue(p, "stock")) + '</td><td>' + escapeHtml(mapValue(p, "sales")) + '</td><td>' + Number(mapValue(p, "averageRating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(p, "reviewCount") || 0) + '</td><td>' + escapeHtml(mapValue(p, "favoriteCount") || 0) + '</td><td><button class="ghost-btn analytics-product-detail" data-id="' + escapeHtml(id) + '" type="button">查看详情</button></td></tr>';
+	}).join("") || '<tr><td colspan="10">暂无商品分析数据。</td></tr>';
 }
 
 function renderAnalyticsProductDetailModal(data) {
@@ -2732,7 +2740,7 @@ function renderMerchantAnalytics() {
 		{ key: "shopRating", label: "店铺星级", icon: "星", rating: true },
 		{ key: "reviewCount", label: "评价数", icon: "评" },
 		{ key: "favoriteCount", label: "收藏数", icon: "藏" }
-	]) + '<section class="panel-card admin-section"><div class="section-head"><div><h2>商品表现</h2><p>销量、评分、收藏和评论都来自真实用户操作；点击详情可查看该商品评价。</p></div></div><div class="admin-table analytics-products-table"><table><thead><tr><th>ID</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th><th>操作</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' + renderAnalyticsProductDetailModal(data);
+	]) + '<section class="panel-card admin-section"><div class="section-head"><div><h2>商品表现</h2><p>销量、评分、收藏和评论都来自真实用户操作；点击详情可查看该商品评价。</p></div></div><div class="admin-table analytics-products-table"><table><thead><tr><th>ID</th><th>图片</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th><th>操作</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' + renderAnalyticsProductDetailModal(data);
 }
 
 function renderAdminAnalytics() {
@@ -2752,7 +2760,7 @@ function renderAdminAnalytics() {
 		{ key: "merchantCount", label: "店铺总量", icon: "店" },
 		{ key: "userCount", label: "用户总量", icon: "人" }
 	]) + '<section class="panel-card admin-section"><div class="section-head"><div><h2>店铺分析</h2><p>按店铺汇总销量、评分、收藏和评论。</p></div></div><div class="admin-table"><table><thead><tr><th>商家ID</th><th>店铺</th><th>商品</th><th>销量</th><th>星级</th><th>评论</th><th>收藏</th></tr></thead><tbody>' + shops + '</tbody></table></div></section>' +
-		'<section class="panel-card admin-section"><div class="section-head"><div><h2>商品排行</h2><p>后台用于观察首页智能入口排序效果。</p></div></div><div class="admin-table analytics-products-table"><table><thead><tr><th>ID</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th><th>操作</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' + renderAnalyticsProductDetailModal(data);
+		'<section class="panel-card admin-section"><div class="section-head"><div><h2>商品排行</h2><p>后台用于观察首页智能入口排序效果。</p></div></div><div class="admin-table analytics-products-table"><table><thead><tr><th>ID</th><th>图片</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th><th>操作</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' + renderAnalyticsProductDetailModal(data);
 }
 
 function renderMerchantProductList() {

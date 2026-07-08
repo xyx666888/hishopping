@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletResponse;
 import hishopping.dao.ProductMediaDao;
 import hishopping.entity.Merchant;
 import hishopping.entity.Product;
+import hishopping.service.AccountRestrictionService;
 import hishopping.service.MerchantProductService;
 import hishopping.service.MerchantService;
 import hishopping.service.ProductService;
@@ -25,11 +26,12 @@ public class MerchantProductServlet extends HttpServlet {
     private MerchantProductService service = new MerchantProductService();
     private ProductService productService = new ProductService();
     private MerchantService merchantService = new MerchantService();
+    private AccountRestrictionService restrictionService = new AccountRestrictionService();
 
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Merchant merchant = ServletUtil.currentMerchant(request);
         if (merchant == null) {
-            JsonUtil.write(response, ServletUtil.fail("Please login as merchant first."));
+            JsonUtil.write(response, ServletUtil.fail("请先登录商家账号。"));
             return;
         }
         Map<String, Object> result = new LinkedHashMap<String, Object>();
@@ -44,24 +46,28 @@ public class MerchantProductServlet extends HttpServlet {
         request.setCharacterEncoding("UTF-8");
         Merchant merchant = ServletUtil.currentMerchant(request);
         if (merchant == null) {
-            JsonUtil.write(response, ServletUtil.fail("Please login as merchant first."));
+            JsonUtil.write(response, ServletUtil.fail("请先登录商家账号。"));
             return;
         }
         merchant = activeMerchant(request, merchant);
         if (merchant == null) {
-            JsonUtil.write(response, ServletUtil.fail("Merchant account is not approved for product maintenance."));
+            JsonUtil.write(response, ServletUtil.fail("商家账号当前不可维护商品，请联系管理员。"));
             return;
         }
         try {
             String action = request.getParameter("action");
             int productId = ServletUtil.intParam(request, "productId", 0);
             if ("submit".equals(action)) {
+                restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_on_sale_product");
                 service.onSale(productId, merchant.getMerchantId());
             } else if ("submitAudit".equals(action)) {
+                restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_on_sale_product");
                 service.submitAudit(productId, merchant.getMerchantId());
             } else if ("offSale".equals(action)) {
+                restrictionService.require("MERCHANT", merchant.getMerchantId(), "can_off_sale_product");
                 service.offSale(productId, merchant.getMerchantId());
             } else {
+                restrictionService.require("MERCHANT", merchant.getMerchantId(), "update".equals(action) ? "can_edit_product" : "can_add_product");
                 Product p = new Product();
                 p.setId(productId);
                 p.setMerchantId(merchant.getMerchantId());

@@ -22,7 +22,7 @@ public class DBUtil {
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("SQL Server 驱动没有找到，请确认 sqljdbc4.jar 已放入 WEB-INF/lib。", e);
         } catch (SQLException e) {
-            throw new RuntimeException("连接 hishopping 数据库失败。", e);
+            throw new RuntimeException("连接 hishopping 数据库失败，请确认 SQL Server 已启动且连接配置正确。", e);
         }
     }
 

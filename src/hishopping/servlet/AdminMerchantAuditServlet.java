@@ -32,7 +32,7 @@ public class AdminMerchantAuditServlet extends HttpServlet {
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Admin admin = ServletUtil.currentAdmin(request);
         if (admin == null) {
-            JsonUtil.write(response, ServletUtil.fail("Please login as admin first."));
+            JsonUtil.write(response, ServletUtil.fail("请先用管理员账号登录。"));
             return;
         }
         writeRows(response);
@@ -42,7 +42,7 @@ public class AdminMerchantAuditServlet extends HttpServlet {
         request.setCharacterEncoding("UTF-8");
         Admin admin = ServletUtil.currentAdmin(request);
         if (admin == null) {
-            JsonUtil.write(response, ServletUtil.fail("Please login as admin first."));
+            JsonUtil.write(response, ServletUtil.fail("请先用管理员账号登录。"));
             return;
         }
         try {

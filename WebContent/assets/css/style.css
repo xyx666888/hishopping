@@ -2366,7 +2366,12 @@ button {
 }
 
 .analytics-products-table table {
-	min-width: 1280px;
+	min-width: 1360px;
+}
+
+.analytics-product-thumb {
+	width: 64px;
+	border-radius: 16px;
 }
 
 .analytics-product-detail {

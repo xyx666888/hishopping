@@ -23,7 +23,7 @@ BEGIN
         admin_name NVARCHAR(50) NOT NULL UNIQUE,
         password NVARCHAR(50) NOT NULL,
         real_name NVARCHAR(50) NOT NULL,
-        status NVARCHAR(20) NOT NULL DEFAULT N'姝ｅ父',
+        status NVARCHAR(20) NOT NULL DEFAULT N'正常',
         create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME()
     );
 END
@@ -41,7 +41,7 @@ BEGIN
         points INT NOT NULL DEFAULT 0,
         vip_level INT NOT NULL DEFAULT 1,
         growth_value INT NOT NULL DEFAULT 0,
-        status NVARCHAR(20) NOT NULL DEFAULT N'姝ｅ父',
+        status NVARCHAR(20) NOT NULL DEFAULT N'正常',
         create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME()
     );
 END
@@ -423,6 +423,29 @@ GO
 
 IF COL_LENGTH('dbo.hishopping_order', 'discount_amount') IS NULL
     ALTER TABLE dbo.hishopping_order ADD discount_amount DECIMAL(10,2) NOT NULL CONSTRAINT DF_hishopping_order_discount_amount DEFAULT 0;
+IF OBJECT_ID(N'dbo.hishop_merchant', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.hishop_merchant (
+        merchant_id INT IDENTITY(1,1) PRIMARY KEY,
+        merchant_code NVARCHAR(8) NOT NULL UNIQUE,
+        merchant_name NVARCHAR(80) NOT NULL,
+        password NVARCHAR(80) NOT NULL,
+        register_password_demo NVARCHAR(80) NULL,
+        contact_name NVARCHAR(50) NOT NULL,
+        contact_phone NVARCHAR(30) NOT NULL,
+        email NVARCHAR(100) NULL,
+        shop_name NVARCHAR(100) NOT NULL,
+        shop_desc NVARCHAR(500) NULL,
+        business_category NVARCHAR(100) NULL,
+        business_address NVARCHAR(200) NULL,
+        status NVARCHAR(20) NOT NULL DEFAULT N'PENDING',
+        reject_reason NVARCHAR(500) NULL,
+        create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        update_time DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+        review_time DATETIME2 NULL,
+        review_admin_id INT NULL
+    );
+END;
 IF COL_LENGTH('dbo.hishopping_user', 'avatar_url') IS NULL
     ALTER TABLE dbo.hishopping_user ADD avatar_url NVARCHAR(300) NULL;
 IF COL_LENGTH('dbo.hishopping_user', 'punish_reason') IS NULL
@@ -556,31 +579,6 @@ IF COL_LENGTH('dbo.hishopping_order_item', 'item_unit_price') IS NULL
     ALTER TABLE dbo.hishopping_order_item ADD item_unit_price DECIMAL(10,2) NULL;
 IF COL_LENGTH('dbo.hishopping_order_item', 'item_subtotal') IS NULL
     ALTER TABLE dbo.hishopping_order_item ADD item_subtotal DECIMAL(10,2) NULL;
-GO
-
-IF OBJECT_ID(N'dbo.hishop_merchant', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.hishop_merchant (
-        merchant_id INT IDENTITY(1,1) PRIMARY KEY,
-        merchant_code NVARCHAR(8) NOT NULL UNIQUE,
-        merchant_name NVARCHAR(80) NOT NULL,
-        password NVARCHAR(80) NOT NULL,
-        register_password_demo NVARCHAR(80) NULL,
-        contact_name NVARCHAR(50) NOT NULL,
-        contact_phone NVARCHAR(30) NOT NULL,
-        email NVARCHAR(100) NULL,
-        shop_name NVARCHAR(100) NOT NULL,
-        shop_desc NVARCHAR(500) NULL,
-        business_category NVARCHAR(100) NULL,
-        business_address NVARCHAR(200) NULL,
-        status NVARCHAR(20) NOT NULL DEFAULT N'PENDING',
-        reject_reason NVARCHAR(500) NULL,
-        create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        update_time DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
-        review_time DATETIME2 NULL,
-        review_admin_id INT NULL
-    );
-END
 GO
 
 IF OBJECT_ID(N'dbo.hishop_merchant_audit_log', N'U') IS NULL

@@ -65,7 +65,7 @@ public class AnalyticsDao {
     }
 
     private String productStatsSql(String whereAndOrder) {
-        return "select p.id product_id,p.name product_name,p.category_id,c.name category_name,p.merchant_id,m.merchant_code,m.shop_name,p.price,p.stock,p.sales,p.sale_status,p.audit_status,"
+        return "select p.id product_id,p.name product_name,p.category_id,c.name category_name,p.merchant_id,m.merchant_code,m.shop_name,p.price,p.old_price,p.stock,p.sales,p.sale_status,p.audit_status,p.image_url,p.gradient,p.icon_text,"
                 + "(select count(1) from hishopping_favorite f where f.product_id=p.id) favorite_count,"
                 + "(select count(1) from hishop_product_review r where r.product_id=p.id and isnull(r.status,N'ACTIVE')=N'ACTIVE') review_count,"
                 + "isnull((select avg(cast(r.rating as decimal(5,2))) from hishop_product_review r where r.product_id=p.id and isnull(r.status,N'ACTIVE')=N'ACTIVE'),0) average_rating,"

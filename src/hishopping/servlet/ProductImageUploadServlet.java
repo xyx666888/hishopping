@@ -38,12 +38,12 @@ public class ProductImageUploadServlet extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         Merchant merchant = ServletUtil.currentMerchant(request);
         if (merchant == null) {
-            JsonUtil.write(response, ServletUtil.fail("Please login as merchant first."));
+            JsonUtil.write(response, ServletUtil.fail("请先登录商家账号。"));
             return;
         }
         Merchant refreshed = merchantService.findById(merchant.getMerchantId());
         if (refreshed == null || !"APPROVED".equals(refreshed.getStatus())) {
-            JsonUtil.write(response, ServletUtil.fail("Merchant account is not approved for product media upload."));
+            JsonUtil.write(response, ServletUtil.fail("商家账号当前不可上传商品媒体，请联系管理员。"));
             return;
         }
         request.getSession().setAttribute("merchant", refreshed);
@@ -57,7 +57,7 @@ public class ProductImageUploadServlet extends HttpServlet {
 
         Part part = mediaPart(request);
         if (part == null || part.getSize() == 0) {
-            JsonUtil.write(response, ServletUtil.fail("Please choose a product image or video."));
+            JsonUtil.write(response, ServletUtil.fail("请选择商品图片或视频。"));
             return;
         }
 
@@ -65,15 +65,15 @@ public class ProductImageUploadServlet extends HttpServlet {
         boolean video = submitted.endsWith(".mp4") || submitted.endsWith(".webm");
         boolean image = submitted.endsWith(".jpg") || submitted.endsWith(".jpeg") || submitted.endsWith(".png") || submitted.endsWith(".webp") || submitted.endsWith(".gif");
         if (!video && !image) {
-            JsonUtil.write(response, ServletUtil.fail("Only jpg/jpeg/png/webp/gif images and mp4/webm videos are supported."));
+            JsonUtil.write(response, ServletUtil.fail("仅支持 jpg/jpeg/png/webp/gif 图片和 mp4/webm 视频。"));
             return;
         }
         if (image && part.getSize() > MAX_IMAGE_SIZE) {
-            JsonUtil.write(response, ServletUtil.fail("Product image cannot exceed 8MB."));
+            JsonUtil.write(response, ServletUtil.fail("商品图片不能超过 8MB。"));
             return;
         }
         if (video && part.getSize() > MAX_VIDEO_SIZE) {
-            JsonUtil.write(response, ServletUtil.fail("Product video cannot exceed 80MB."));
+            JsonUtil.write(response, ServletUtil.fail("商品视频不能超过 80MB。"));
             return;
         }
 
@@ -89,7 +89,7 @@ public class ProductImageUploadServlet extends HttpServlet {
         } else {
             BufferedImage source = ImageIO.read(part.getInputStream());
             if (source == null) {
-                JsonUtil.write(response, ServletUtil.fail("Unsupported image content."));
+                JsonUtil.write(response, ServletUtil.fail("图片内容无法识别。"));
                 return;
             }
             BufferedImage scaled = scaleImage(source, ext);
