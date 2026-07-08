@@ -150,8 +150,12 @@ BEGIN
         create_time DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
         CONSTRAINT FK_hishopping_product_media_product FOREIGN KEY(product_id) REFERENCES dbo.hishopping_product(id)
     );
-    CREATE INDEX IX_hishopping_product_media_product ON dbo.hishopping_product_media(product_id, sort_no, id);
 END
+GO
+
+IF OBJECT_ID(N'dbo.hishopping_product_media', N'U') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_hishopping_product_media_product' AND object_id = OBJECT_ID(N'dbo.hishopping_product_media'))
+    EXEC(N'CREATE INDEX IX_hishopping_product_media_product ON dbo.hishopping_product_media(product_id, sort_no, id);');
 GO
 
 IF OBJECT_ID(N'dbo.hishopping_cart_item', N'U') IS NULL

@@ -57,6 +57,8 @@ public class MerchantProductServlet extends HttpServlet {
             int productId = ServletUtil.intParam(request, "productId", 0);
             if ("submit".equals(action)) {
                 service.onSale(productId, merchant.getMerchantId());
+            } else if ("submitAudit".equals(action)) {
+                service.submitAudit(productId, merchant.getMerchantId());
             } else if ("offSale".equals(action)) {
                 service.offSale(productId, merchant.getMerchantId());
             } else {
@@ -80,6 +82,7 @@ public class MerchantProductServlet extends HttpServlet {
                 if ("update".equals(action)) service.update(p, true); else service.add(p);
             }
             Map<String, Object> result = ServletUtil.ok();
+            result.put("merchant", ServletUtil.merchant(activeMerchant(request, merchant)));
             result.put("products", ServletUtil.products(service.products(merchant.getMerchantId())));
             JsonUtil.write(response, result);
         } catch (RuntimeException e) {

@@ -27,7 +27,8 @@ public class MerchantProductService {
     }
 
     public void submitAudit(int productId, int merchantId) {
-        onSale(productId, merchantId);
+        restrictionService.require("MERCHANT", merchantId, "can_edit_product");
+        productDao.submitAudit(productId, merchantId);
     }
 
     public void onSale(int productId, int merchantId) {

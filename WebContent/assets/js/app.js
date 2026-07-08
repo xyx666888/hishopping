@@ -70,6 +70,7 @@ var state = {
 	activeReviewReplyId: null,
 	merchantAnalytics: null,
 	adminAnalytics: null,
+	analyticsDetailProductId: null,
 	merchantAuditFilter: "pending",
 	merchantManageSearch: "",
 	merchantExpandedId: null,
@@ -107,7 +108,8 @@ var state = {
 	selectedStackableCouponId: null,
 	selectedMerchantCouponId: null,
 	couponCenterCollapsed: false,
-	settingsPanel: ""
+	settingsPanel: "",
+	merchantSettingsPanel: ""
 };
 
 var apiBasePath = String(window.HISHOPPING_CONTEXT_PATH || "").replace(/\/$/, "");
@@ -180,7 +182,7 @@ var userNavItems = [
 	{ key: "home", label: "购物主页", icon: "assets/img/nav-home.png" },
 	{ key: "cart", label: "购物车", icon: "assets/img/nav-cart.png" },
 	{ key: "orders", label: "订单", icon: "assets/img/nav-orders.png" },
-	{ key: "reports", label: "我的举报", icon: "assets/img/nav-report-icon.png?v=report-nav-20260707-1" },
+	{ key: "reports", label: "我的举报", icon: "assets/img/nav-report-icon.png?v=report-nav-20260707-2" },
 	{ key: "profile", label: "个人中心", icon: "assets/img/nav-profile.png" },
 	{ key: "messages", label: "我的消息", icon: "assets/img/nav-message-icon.png" },
 	{ key: "vip", label: "VIP中心", icon: "assets/img/nav-vip-center.png?v=nav-vip-tight-20260601" },
@@ -191,8 +193,8 @@ var merchantNavItems = [
 	{ key: "merchantCenter", label: "商家首页", icon: "assets/img/auth-merchant-role.png" },
 	{ key: "merchantProductList", label: "商品管理", icon: "assets/img/nav-detail.png" },
 	{ key: "merchantOrders", label: "订单管理", icon: "assets/img/nav-orders.png" },
-	{ key: "merchantReports", label: "举报管理", icon: "assets/img/nav-report-icon.png?v=report-nav-20260707-1" },
-	{ key: "merchantAnalytics", label: "数据分析", icon: "assets/img/nav-hall-display-icon.png" },
+	{ key: "merchantReports", label: "举报管理", icon: "assets/img/nav-report-icon.png?v=report-nav-20260707-2" },
+	{ key: "merchantAnalytics", label: "数据分析", icon: "assets/img/nav-analytics-icon.png?v=20260708" },
 	{ key: "merchantCoupons", label: "店铺优惠券", icon: "assets/img/top-coupon-icon.png" },
 	{ key: "merchantProfile", label: "店铺资料", icon: "assets/img/nav-profile.png" },
 	{ key: "merchantMessages", label: "我的消息", icon: "assets/img/nav-message-icon.png" }
@@ -206,8 +208,8 @@ var adminNavItems = [
 	{ key: "adminMerchantAudit", label: "商家管理", icon: "assets/img/auth-merchant-role.png" },
 	{ key: "adminUsers", label: "用户管理", icon: "assets/img/nav-profile.png" },
 	{ key: "adminOrders", label: "订单管理", icon: "assets/img/nav-orders.png" },
-	{ key: "adminReports", label: "举报管理", icon: "assets/img/nav-report-icon.png?v=report-nav-20260707-1" },
-	{ key: "adminAnalytics", label: "数据分析", icon: "assets/img/nav-hall-display-icon.png" },
+	{ key: "adminReports", label: "举报管理", icon: "assets/img/nav-report-icon.png?v=report-nav-20260707-2" },
+	{ key: "adminAnalytics", label: "数据分析", icon: "assets/img/nav-analytics-icon.png?v=20260708" },
 	{ key: "adminCouponCenter", label: "优惠券管理", icon: "assets/img/top-coupon-icon.png" }
 ];
 
@@ -385,6 +387,136 @@ function escapeHtml(text) {
 	return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch) {
 		return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch];
 	});
+}
+
+function openAvatarCropper(file, onConfirm) {
+	if (!file) return;
+	var old = document.querySelector(".avatar-crop-backdrop");
+	if (old) old.remove();
+	var imageUrl = URL.createObjectURL(file);
+	var modal = document.createElement("div");
+	modal.className = "avatar-crop-backdrop";
+	modal.innerHTML = '<div class="avatar-crop-card"><div class="section-head"><div><h3>截取头像</h3><p>拖动方框选择头像区域，调整大小后确认。</p></div><button class="ghost-btn avatar-crop-close" type="button">关闭</button></div><canvas id="avatarCropCanvas" width="560" height="420"></canvas><div class="avatar-crop-tools"><label class="field"><span>截取范围</span><input id="avatarCropSize" type="range" min="25" max="100" value="72"></label><div class="form-actions"><button class="ghost-btn avatar-crop-close" type="button">取消</button><button class="primary-btn avatar-crop-confirm" type="button">确认截取</button></div></div></div>';
+	document.body.appendChild(modal);
+	var canvas = modal.querySelector("#avatarCropCanvas");
+	var ctx = canvas.getContext("2d");
+	var slider = modal.querySelector("#avatarCropSize");
+	var img = new Image();
+	var rect = { x: 0, y: 0, w: 0, h: 0, scale: 1 };
+	var crop = { x: 0, y: 0, size: 120 };
+	var dragging = false;
+	var dragOffset = { x: 0, y: 0 };
+	var close = function() {
+		window.removeEventListener("mousemove", moveDrag);
+		window.removeEventListener("mouseup", endDrag);
+		window.removeEventListener("touchmove", moveDrag);
+		window.removeEventListener("touchend", endDrag);
+		URL.revokeObjectURL(imageUrl);
+		modal.remove();
+	};
+	var clampCrop = function() {
+		if (crop.size > rect.w) crop.size = rect.w;
+		if (crop.size > rect.h) crop.size = rect.h;
+		crop.x = Math.max(rect.x, Math.min(rect.x + rect.w - crop.size, crop.x));
+		crop.y = Math.max(rect.y, Math.min(rect.y + rect.h - crop.size, crop.y));
+	};
+	var draw = function() {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		ctx.fillStyle = "#f8fafc";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h);
+		ctx.save();
+		ctx.fillStyle = "rgba(15, 23, 42, .48)";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.beginPath();
+		ctx.rect(crop.x, crop.y, crop.size, crop.size);
+		ctx.clip();
+		ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h);
+		ctx.restore();
+		ctx.strokeStyle = "#7c3aed";
+		ctx.lineWidth = 3;
+		ctx.strokeRect(crop.x + 1.5, crop.y + 1.5, crop.size - 3, crop.size - 3);
+		ctx.strokeStyle = "rgba(255,255,255,.9)";
+		ctx.lineWidth = 1;
+		ctx.strokeRect(crop.x + crop.size / 3, crop.y, crop.size / 3, crop.size);
+		ctx.strokeRect(crop.x, crop.y + crop.size / 3, crop.size, crop.size / 3);
+	};
+	var point = function(e) {
+		var box = canvas.getBoundingClientRect();
+		var touch = e.touches && e.touches[0] ? e.touches[0] : e;
+		return {
+			x: (touch.clientX - box.left) * (canvas.width / box.width),
+			y: (touch.clientY - box.top) * (canvas.height / box.height)
+		};
+	};
+	img.onload = function() {
+		var scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+		rect.w = img.width * scale;
+		rect.h = img.height * scale;
+		rect.x = (canvas.width - rect.w) / 2;
+		rect.y = (canvas.height - rect.h) / 2;
+		rect.scale = scale;
+		crop.size = Math.min(rect.w, rect.h) * Number(slider.value || 72) / 100;
+		crop.x = rect.x + (rect.w - crop.size) / 2;
+		crop.y = rect.y + (rect.h - crop.size) / 2;
+		draw();
+	};
+	img.src = imageUrl;
+	slider.oninput = function() {
+		var centerX = crop.x + crop.size / 2;
+		var centerY = crop.y + crop.size / 2;
+		crop.size = Math.min(rect.w, rect.h) * Number(slider.value || 72) / 100;
+		crop.x = centerX - crop.size / 2;
+		crop.y = centerY - crop.size / 2;
+		clampCrop();
+		draw();
+	};
+	var startDrag = function(e) {
+		var p = point(e);
+		if (p.x < crop.x || p.x > crop.x + crop.size || p.y < crop.y || p.y > crop.y + crop.size) return;
+		dragging = true;
+		dragOffset.x = p.x - crop.x;
+		dragOffset.y = p.y - crop.y;
+		e.preventDefault();
+	};
+	var moveDrag = function(e) {
+		if (!dragging) return;
+		var p = point(e);
+		crop.x = p.x - dragOffset.x;
+		crop.y = p.y - dragOffset.y;
+		clampCrop();
+		draw();
+		e.preventDefault();
+	};
+	var endDrag = function() { dragging = false; };
+	canvas.addEventListener("mousedown", startDrag);
+	window.addEventListener("mousemove", moveDrag);
+	window.addEventListener("mouseup", endDrag);
+	canvas.addEventListener("touchstart", startDrag, { passive: false });
+	window.addEventListener("touchmove", moveDrag, { passive: false });
+	window.addEventListener("touchend", endDrag);
+	Array.prototype.forEach.call(modal.querySelectorAll(".avatar-crop-close"), function(btn) {
+		btn.onclick = close;
+	});
+	modal.querySelector(".avatar-crop-confirm").onclick = function() {
+		clampCrop();
+		var sx = Math.max(0, (crop.x - rect.x) / rect.scale);
+		var sy = Math.max(0, (crop.y - rect.y) / rect.scale);
+		var sw = Math.min(img.width - sx, crop.size / rect.scale);
+		var output = document.createElement("canvas");
+		output.width = 512;
+		output.height = 512;
+		output.getContext("2d").drawImage(img, sx, sy, sw, sw, 0, 0, 512, 512);
+		output.toBlob(function(blob) {
+			if (!blob) {
+				alert("头像截取失败，请重新选择图片。");
+				return;
+			}
+			var croppedUrl = URL.createObjectURL(blob);
+			onConfirm(blob, croppedUrl, file.name || "avatar.png");
+			close();
+		}, "image/png");
+	};
 }
 
 function productVisual(product, large) {
@@ -860,14 +992,27 @@ function updateUserChip() {
 	updateVipEntry();
 }
 
+function globalSearchEnabled() {
+	return !state.admin && !state.merchant && state.page === "home";
+}
+
 function updateShellForRole() {
 	var appPage = document.getElementById("appPage");
+	var topbar = document.querySelector(".topbar");
 	var search = document.getElementById("searchInput");
+	var searchBox = search ? search.closest(".search-box") : null;
+	var showGlobalSearch = globalSearchEnabled();
 	if (appPage) {
 		appPage.classList.toggle("admin-mode", !!state.admin);
 		appPage.classList.toggle("merchant-mode", !!state.merchant);
 	}
-	if (search) search.placeholder = state.admin ? "搜索商品、用户、订单..." : (state.merchant ? "搜索本店商品..." : "搜索商品、订单、用户...");
+	if (topbar) topbar.classList.toggle("no-global-search", !showGlobalSearch);
+	if (searchBox) searchBox.classList.toggle("hidden", !showGlobalSearch);
+	if (search) {
+		search.placeholder = "搜索商品名称、分类、描述...";
+		if (!showGlobalSearch && state.searchKeyword) state.searchKeyword = "";
+		if (search.value !== state.searchKeyword) search.value = state.searchKeyword || "";
+	}
 	updateUserChip();
 }
 
@@ -947,6 +1092,7 @@ function renderNav() {
 		var suffix = navCount ? '<span>' + navCount + '</span>' : "";
 		var iconClass = item.key.indexOf("Messages") >= 0 || item.key === "messages" ? " nav-icon-message" : "";
 		if (item.key === "reports" || item.key === "merchantReports" || item.key === "adminReports") iconClass += " nav-icon-report";
+		if (item.key === "merchantAnalytics" || item.key === "adminAnalytics") iconClass += " nav-icon-analytics";
 		return '<button type="button" class="' + (state.page === item.key ? "active" : "") + '" data-page="' + item.key + '">' +
 			'<span class="nav-label"><img class="nav-icon' + iconClass + '" src="' + item.icon + '" alt="">' + item.label + '</span>' + suffix + '</button>';
 	}).join("");
@@ -981,6 +1127,7 @@ function setPage(page) {
 	if (state.merchant && !isMerchantPage(page)) page = "merchantCenter";
 	if (!state.admin && isAdminPage(page)) page = "home";
 	if (!state.merchant && isMerchantPage(page)) page = "home";
+	if (page === "merchantProfile") state.merchantSettingsPanel = "";
 	state.page = page;
 	try {
 		sessionStorage.setItem("hishoppingPage", page);
@@ -1030,6 +1177,7 @@ function loadPageData(page) {
 	if (page === "messages" || page === "merchantMessages" || page === "adminMessages") {
 		return Promise.all([
 			loadMessages(),
+			state.user ? loadFriendRequests() : Promise.resolve(),
 			state.user ? loadOrders() : Promise.resolve()
 		]);
 	}
@@ -1119,6 +1267,16 @@ function loadMessages() {
 				return loadConversationMessages(state.activeConversationId);
 			}
 		}
+	});
+}
+
+function loadFriendRequests() {
+	if (!state.user) {
+		state.friendRequests = [];
+		return Promise.resolve();
+	}
+	return get("friends?action=requests").then(function(data) {
+		if (data.success) state.friendRequests = data.requests || [];
 	});
 }
 
@@ -1394,10 +1552,10 @@ function openDetail(productId, sourcePage) {
 }
 
 var smartFeeds = [
-	{ key: "recommend", name: "推荐", iconText: "荐", description: "结合你的浏览、收藏和购买偏好", title: "为你推荐", subtitle: "按你的历史行为优先展示更可能喜欢的商品。" },
-	{ key: "hot", name: "热门", iconText: "热", description: "销量和评分更高的热门商品", title: "热门商品", subtitle: "按销量、评分和热度展示当前更受欢迎的商品。" },
-	{ key: "featured", name: "精选", iconText: "精", description: "高评分好评商品优先展示", title: "精选好物", subtitle: "优先展示评分 4 分以上、口碑更稳的商品。" },
-	{ key: "discover", name: "发现", iconText: "发", description: "收藏和讨论热度更高的商品", title: "发现好物", subtitle: "按收藏、评论和销量发现更多值得看的商品。" }
+	{ key: "recommend", name: "推荐", iconSrc: "assets/img/feed-recommend.png?v=20260707", description: "结合你的浏览、收藏和购买偏好", title: "为你推荐", subtitle: "按你的历史行为优先展示更可能喜欢的商品。" },
+	{ key: "hot", name: "热门", iconSrc: "assets/img/feed-hot.png?v=20260707", description: "销量和评分更高的热门商品", title: "热门商品", subtitle: "按销量、评分和热度展示当前更受欢迎的商品。" },
+	{ key: "featured", name: "精选", iconSrc: "assets/img/feed-featured.png?v=20260707", description: "高评分好评商品优先展示", title: "精选好物", subtitle: "优先展示评分 4 分以上、口碑更稳的商品。" },
+	{ key: "discover", name: "发现", iconSrc: "assets/img/feed-discover.png?v=20260707", description: "收藏和讨论热度更高的商品", title: "发现好物", subtitle: "按收藏、评论和销量发现更多值得看的商品。" }
 ];
 
 function activeFeedInfo() {
@@ -1550,7 +1708,7 @@ function renderHome() {
 	var feedInfo = activeFeedInfo();
 	var categoryHtml = smartFeeds.map(function(feed) {
 		var active = String(state.activeFeed || "recommend") === feed.key;
-		return '<button class="simple-card category-card smart-feed-card ' + (active ? "selected" : "") + '" data-feed="' + feed.key + '" type="button"><div class="icon-tile">' + escapeHtml(feed.iconText) + '</div><strong>' + escapeHtml(feed.name) + '</strong><span>' + escapeHtml(feed.title) + '</span><small>' + escapeHtml(feed.description) + '</small></button>';
+		return '<button class="simple-card category-card smart-feed-card ' + (active ? "selected" : "") + '" data-feed="' + feed.key + '" type="button"><div class="icon-tile"><img src="' + escapeHtml(feed.iconSrc) + '" alt="' + escapeHtml(feed.name) + '"></div><strong>' + escapeHtml(feed.name) + '</strong><span>' + escapeHtml(feed.title) + '</span><small>' + escapeHtml(feed.description) + '</small></button>';
 	}).join("");
 
 	var visibleProducts = state.products.filter(function(p) {
@@ -1786,7 +1944,7 @@ function renderSettingsPanel(u) {
 		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="profile"><label class="field"><span>用户名</span><input id="profileUsername" value="' + escapeHtml(u.username || "") + '"></label><label class="field"><span>手机号</span><input id="profilePhone" value="' + escapeHtml(u.phone || "") + '"></label><label class="field"><span>邮箱</span><input id="profileEmail" value="' + escapeHtml(u.email || "") + '"></label><div class="form-actions"><button class="primary-btn account-request-submit" type="submit">保存资料</button></div></form></section>';
 	}
 	if (panel === "avatar") {
-		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="avatar"><div class="field wide account-avatar-field"><span>当前头像</span><div class="avatar-upload-row"><div class="request-avatar-preview" id="accountAvatarPreview">' + (u.avatarUrl ? '<img src="' + escapeHtml(u.avatarUrl) + '" alt="">' : '') + '</div><div><input id="accountAvatarFile" type="file" accept="image/*"><p class="muted" id="accountAvatarHint">选择图片后立即更新当前头像。</p><div class="upload-progress" id="avatarUploadProgress"><i></i></div></div></div></div></form></section>';
+		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="avatar"><div class="field wide account-avatar-field"><span>当前头像</span><div class="avatar-upload-row"><div class="request-avatar-preview" id="accountAvatarPreview">' + (u.avatarUrl ? '<img src="' + escapeHtml(u.avatarUrl) + '" alt="">' : '') + '</div><div><input id="accountAvatarFile" type="file" accept="image/*"><p class="muted" id="accountAvatarHint">选择图片后截取方形区域，确认后点击保存头像。</p><div class="upload-progress" id="avatarUploadProgress"><i></i></div></div></div></div><div class="form-actions"><button class="primary-btn account-avatar-save" type="submit">保存头像</button></div></form></section>';
 	}
 	if (panel === "password") {
 		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="password"><label class="field"><span>旧密码</span><input id="profileOldPassword" type="password" placeholder="修改密码时必填"></label><label class="field"><span>新密码</span><input id="profilePassword" type="password" placeholder="至少 6 位"></label><div class="form-actions"><button class="primary-btn account-request-submit" type="submit">保存密码</button></div></form></section>';
@@ -1961,16 +2119,19 @@ function renderMessages() {
 	var targetRows = (state.messageTargets || []).map(function(t) {
 		return '<button class="chat-target" data-role="' + escapeHtml(t.role) + '" data-id="' + t.id + '" type="button">' + avatarHtml(t.avatarUrl, t.name) + '<span><b>' + escapeHtml(t.name) + '</b><small>' + escapeHtml(t.subtitle || roleName(t.role)) + '</small></span></button>';
 	}).join("");
+	var friendRequestRows = state.user && (state.friendRequests || []).length ? '<div class="friend-request-panel"><b>待处理好友申请</b>' + (state.friendRequests || []).map(function(r) {
+		return '<article class="friend-request-item">' + avatarHtml(r.fromAvatar, r.fromName) + '<div><strong>' + escapeHtml(r.fromName || "用户") + '</strong><small>ID ' + escapeHtml(r.fromAccountId || r.fromUserId || "") + '</small><p>' + escapeHtml(r.message || "请求添加你为好友") + '</p></div><div class="friend-request-actions"><button class="primary-btn friend-handle" data-id="' + escapeHtml(r.id || 0) + '" data-action="accept" type="button">同意</button><button class="ghost-btn friend-handle" data-id="' + escapeHtml(r.id || 0) + '" data-action="reject" type="button">拒绝</button></div></article>';
+	}).join("") + '</div>' : "";
 	var messages = current ? (state.messages || []).map(renderChatMessage).join("") : '<div class="chat-empty"><h3>选择一个会话</h3><p class="muted">左侧选择会话，或搜索联系人发起聊天。</p></div>';
 	var disabled = !current || Number(current.conversationId) === 0 ? "disabled" : "";
 	var sendDisabled = disabled || state.chatSending ? "disabled" : "";
 	var sendText = state.chatSending ? "发送中..." : "发送";
 	var header = current ? avatarHtml(current.peerAvatar, current.peerName) + '<div><h3>' + escapeHtml(current.peerName) + '</h3><p>' + roleName(current.peerRole) + ' #' + escapeHtml(current.peerId) + '</p></div>' : '<span class="chat-avatar text-avatar">聊</span><div><h3>我的消息</h3><p>真实会话、附件和未读提醒已接入数据库</p></div>';
 	var modal = renderChatModal();
-	var friendEntry = state.user ? '<button class="primary-btn chat-modal-open" data-modal="friend" type="button">添加好友</button>' : '';
+	var friendEntry = state.user ? '<button class="primary-btn chat-modal-open chat-add-friend" data-modal="friend" type="button">添加好友</button>' : '';
 	var emojiPanelClass = state.emojiPanelOpen ? " show" : "";
-	return '<section class="message-page chat-page"><div class="message-hero chat-hero"><img src="assets/img/nav-message.png" alt=""><div><span class="badge">业务沟通中心</span><h2>我的消息</h2><p>' + role + '端消息支持好友、订单咨询、商品卡片、退款售后和附件消息。</p></div>' + friendEntry + '</div>' +
-		'<div class="chat-shell"><aside class="chat-sidebar"><div class="chat-search"><select id="chatTargetRole">' + targetRoleOptions + '</select><input id="chatTargetKeyword" value="' + escapeHtml(state.messageSearchKeyword || "") + '" placeholder="搜索联系人"><button class="ghost-btn" id="chatTargetSearch" type="button">搜索</button></div><div class="chat-targets">' + targetRows + '</div><div class="conversation-list">' + convRows + '</div></aside>' +
+	return '<section class="message-page chat-page">' +
+		'<div class="chat-shell"><aside class="chat-sidebar"><div class="chat-search"><select id="chatTargetRole">' + targetRoleOptions + '</select><input id="chatTargetKeyword" value="' + escapeHtml(state.messageSearchKeyword || "") + '" placeholder="搜索联系人"><div class="chat-search-actions"><button class="ghost-btn" id="chatTargetSearch" type="button">搜索</button>' + friendEntry + '</div></div>' + friendRequestRows + '<div class="chat-targets">' + targetRows + '</div><div class="conversation-list">' + convRows + '</div></aside>' +
 		'<section class="chat-window"><header class="chat-window-head">' + header + '</header><main class="chat-messages" id="chatMessages">' + messages + '</main><form class="chat-input" id="chatInputForm"><div class="emoji-panel' + emojiPanelClass + '" id="emojiPanel"><button type="button">&#128512;</button><button type="button">&#128077;</button><button type="button">&#10084;&#65039;</button><button type="button">&#128514;</button><button type="button">&#128546;</button><button type="button">&#128558;</button></div>' + renderChatQuotePreview(disabled) + '<textarea id="chatInputText" ' + disabled + ' rows="2" placeholder="' + (disabled ? "系统通知不可回复，请选择聊天会话" : "输入消息，Enter 发送，Shift+Enter 换行") + '"></textarea><div class="chat-tools"><button class="ghost-btn" id="emojiToggle" type="button" ' + disabled + '>表情</button><button class="ghost-btn chat-modal-open" data-modal="order" type="button" ' + disabled + '>发送订单</button><button class="ghost-btn chat-send-product" type="button" ' + disabled + '>发送商品</button><button class="ghost-btn chat-modal-open" data-modal="refund" type="button" ' + disabled + '>申请退款</button><label class="ghost-btn ' + disabled + '">图片<input id="chatImageFile" type="file" accept="image/*" ' + disabled + '></label><label class="ghost-btn ' + disabled + '">文件<input id="chatDocFile" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.zip,.rar,.ppt,.pptx,.csv" ' + disabled + '></label><label class="ghost-btn ' + disabled + '">视频<input id="chatVideoFile" type="file" accept="video/mp4,video/webm" ' + disabled + '></label><span class="chat-upload-progress" id="chatUploadProgress"><i></i></span><button class="primary-btn chat-send-btn" type="submit" ' + sendDisabled + '>' + sendText + '</button></div></form></section></div>' + modal + renderChatContextMenu() + '</section>';
 }
 
@@ -2176,13 +2337,47 @@ function renderMerchantOrders() {
 	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>订单管理</h2><p>仅展示本店商品相关订单，待发货订单可由商家填写物流发货。</p></div><select class="admin-input compact-select" id="merchantOrderStatusFilter"><option value="all">全部状态</option>' + statuses.map(function(status) { return '<option value="' + status + '" ' + (state.merchantOrderStatusFilter === status ? "selected" : "") + '>' + status + '</option>'; }).join("") + '</select></div><div class="admin-table tall merchant-orders-table"><table><thead><tr><th>订单编号</th><th>本店商品</th><th>买家</th><th>收货人</th><th>收货地址</th><th>物流</th><th>售后</th><th>本店金额</th><th>状态</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
 }
 
+function renderMerchantSettingsCards(m) {
+	var cards = [
+		["profile", "店铺资料", "维护商家名称、店铺名称和联系方式", "资", "can_edit_profile"],
+		["business", "经营信息", "维护经营类目、地址和店铺简介", "营", "can_edit_profile"],
+		["avatar", "店铺头像", "选择图片后点击保存更新头像", "像", "can_edit_avatar"],
+		["password", "修改密码", "留空不修改，保存后下次登录生效", "密", "can_edit_profile"],
+		["cancel", "注销商家账号", "进入 7 天冷静期，正式注销后商品下架", "注", "can_cancel_account"]
+	];
+	return '<div class="settings-card-grid merchant-settings-card-grid">' + cards.map(function(item) {
+		var restricted = item[4] ? !!restrictionFor(m, item[4]) : false;
+		var attrs = restricted ? ' disabled title="' + escapeHtml(restrictionHint(m, item[4])) + '"' : ' data-merchant-setting="' + item[0] + '"';
+		return '<button class="simple-card settings-card merchant-settings-card" type="button"' + attrs + '><div class="icon-tile">' + item[3] + '</div><strong>' + item[1] + '</strong><span>' + escapeHtml(restricted ? restrictionHint(m, item[4]) : item[2]) + '</span></button>';
+	}).join("") + '</div>';
+}
+
+function renderMerchantSettingsPanel(m) {
+	var panel = state.merchantSettingsPanel || "";
+	var titleMap = { profile: "店铺资料", business: "经营信息", avatar: "店铺头像", password: "修改密码", cancel: "注销商家账号" };
+	var head = '<div class="section-head compact-head"><div><h3>' + escapeHtml(titleMap[panel] || "店铺资料") + '</h3><p>单项设置保存后立即生效。</p></div><button class="ghost-btn merchant-settings-back" type="button">返回设置</button></div>';
+	if (panel === "profile") {
+		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="merchantProfile"><label class="field"><span>商家编号</span><input class="admin-input" value="' + escapeHtml(m.merchantCode || "") + '" disabled></label><label class="field"><span>商家名称</span><input id="merchantProfileName" class="admin-input" value="' + escapeHtml(m.merchantName || "") + '"></label><label class="field"><span>店铺名称</span><input id="merchantProfileShopName" class="admin-input" value="' + escapeHtml(m.shopName || "") + '"></label><label class="field"><span>联系人</span><input id="merchantProfileContactName" class="admin-input" value="' + escapeHtml(m.contactName || "") + '"></label><label class="field"><span>联系电话</span><input id="merchantProfileContactPhone" class="admin-input" value="' + escapeHtml(m.contactPhone || "") + '"></label><label class="field"><span>邮箱</span><input id="merchantProfileEmail" class="admin-input" value="' + escapeHtml(m.email || "") + '"></label><div class="form-actions"><button class="primary-btn account-request-submit" type="submit">保存店铺资料</button></div></form></section>';
+	}
+	if (panel === "business") {
+		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="merchantBusiness"><label class="field"><span>经营类目</span><input id="merchantProfileCategory" class="admin-input" value="' + escapeHtml(m.businessCategory || "") + '"></label><label class="field wide"><span>经营地址</span><input id="merchantProfileAddress" class="admin-input" value="' + escapeHtml(m.businessAddress || "") + '"></label><label class="field wide"><span>店铺简介</span><input id="merchantProfileDesc" class="admin-input" value="' + escapeHtml(m.shopDesc || "") + '"></label><div class="form-actions"><button class="primary-btn account-request-submit" type="submit">保存经营信息</button></div></form></section>';
+	}
+	if (panel === "avatar") {
+		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="avatar"><div class="field wide account-avatar-field"><span>店铺头像</span><div class="avatar-upload-row"><div class="request-avatar-preview" id="accountAvatarPreview">' + (m.avatarUrl ? '<img src="' + escapeHtml(m.avatarUrl) + '" alt="">' : '') + '</div><div><input id="accountAvatarFile" type="file" accept="image/*"><p class="muted" id="accountAvatarHint">选择图片后截取方形区域，确认后点击保存头像。</p><div class="upload-progress" id="avatarUploadProgress"><i></i></div></div></div></div><div class="form-actions"><button class="primary-btn account-avatar-save" type="submit">保存头像</button></div></form></section>';
+	}
+	if (panel === "password") {
+		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<form class="address-form account-request-form settings-feature-form" id="accountRequestForm" data-setting-action="merchantPassword"><label class="field"><span>新密码</span><input id="merchantProfilePassword" type="password" placeholder="留空则不修改"></label><div class="form-actions"><button class="primary-btn account-request-submit" type="submit">保存密码</button></div></form></section>';
+	}
+	if (panel === "cancel") {
+		return '<section class="panel-card admin-section settings-detail-panel">' + head + '<div class="settings-cancel-box"><h3>注销商家账号冷静期</h3><p class="muted">提交后商家账号进入 7 天冷静期。7 天内重新登录会自动取消注销；冷静期结束后正式注销，并自动下架该商家的商品，历史订单、消息和举报记录会保留。</p><button class="danger-btn account-cancel-direct" type="button">注销商家账号</button></div></section>';
+	}
+	return "";
+}
+
 function renderMerchantProfile() {
 	var m = state.merchant || {};
-	var profileRestricted = !!restrictionFor(m, "can_edit_profile");
-	var avatarRestricted = !!restrictionFor(m, "can_edit_avatar");
-	var cancelRestricted = !!restrictionFor(m, "can_cancel_account");
 	var statusLine = m.status === "CANCEL_PENDING" ? '<p class="form-message ok">商家账号注销冷静期至 ' + escapeHtml(String(m.cancelDeadlineTime || "").slice(0, 19)) + '，7 天内重新登录会自动取消注销。</p>' : "";
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>店铺资料</h2><p>店铺头像和基础资料保存后立即生效。</p></div></div>' + statusLine + '<form class="address-form account-request-form" id="accountRequestForm"><div class="field wide account-avatar-field"><span>店铺头像</span><div class="avatar-upload-row"><div class="request-avatar-preview" id="accountAvatarPreview">' + (m.avatarUrl ? '<img src="' + escapeHtml(m.avatarUrl) + '" alt="">' : '') + '</div><div><input id="accountAvatarFile" type="file" accept="image/*" ' + (avatarRestricted ? "disabled" : "") + '><p class="muted" id="accountAvatarHint">' + escapeHtml(avatarRestricted ? restrictionHint(m, "can_edit_avatar") : "选择图片后立即更新店铺头像。") + '</p><div class="upload-progress" id="avatarUploadProgress"><i></i></div></div></div></div><label class="field"><span>商家编号</span><input class="admin-input" value="' + escapeHtml(m.merchantCode || "") + '" disabled></label><label class="field"><span>商家名称</span><input id="merchantProfileName" class="admin-input" value="' + escapeHtml(m.merchantName || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field"><span>店铺名称</span><input id="merchantProfileShopName" class="admin-input" value="' + escapeHtml(m.shopName || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field"><span>联系人</span><input id="merchantProfileContactName" class="admin-input" value="' + escapeHtml(m.contactName || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field"><span>联系电话</span><input id="merchantProfileContactPhone" class="admin-input" value="' + escapeHtml(m.contactPhone || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field"><span>邮箱</span><input id="merchantProfileEmail" class="admin-input" value="' + escapeHtml(m.email || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field"><span>经营类目</span><input id="merchantProfileCategory" class="admin-input" value="' + escapeHtml(m.businessCategory || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field wide"><span>经营地址</span><input id="merchantProfileAddress" class="admin-input" value="' + escapeHtml(m.businessAddress || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field wide"><span>店铺简介</span><input id="merchantProfileDesc" class="admin-input" value="' + escapeHtml(m.shopDesc || "") + '" ' + (profileRestricted ? "disabled" : "") + '></label><label class="field"><span>登录密码</span><input id="merchantProfilePassword" type="password" placeholder="留空则不修改" ' + (profileRestricted ? "disabled" : "") + '></label><div class="form-actions wide"><button class="primary-btn account-request-submit" type="submit" ' + (profileRestricted ? "disabled" : "") + '>保存店铺资料</button><button class="danger-btn account-cancel-direct" type="button" ' + (cancelRestricted ? "disabled" : "") + '>注销商家账号</button></div>' + (profileRestricted ? '<p class="muted wide">' + escapeHtml(restrictionHint(m, "can_edit_profile")) + '</p>' : '') + (cancelRestricted ? '<p class="muted wide">' + escapeHtml(restrictionHint(m, "can_cancel_account")) + '</p>' : '') + '</form></section>';
+	return '<section class="favorite-page settings-page merchant-settings-page"><div class="section-head"><div><h2>店铺资料</h2><p>每张卡片代表一项店铺功能，点进去单独维护。</p></div></div>' + statusLine + (state.merchantSettingsPanel ? renderMerchantSettingsPanel(m) : renderMerchantSettingsCards(m)) + '</section>';
 }
 
 function renderMerchantCenter() {
@@ -2204,10 +2399,33 @@ function mapValue(row, key) {
 	if (!row) return "";
 	if (row[key] != null) return row[key];
 	var lower = key.toLowerCase();
+	var snake = key.replace(/[A-Z]/g, function(ch) { return "_" + ch.toLowerCase(); });
 	for (var k in row) {
 		if (Object.prototype.hasOwnProperty.call(row, k) && String(k).toLowerCase() === lower) return row[k];
+		if (Object.prototype.hasOwnProperty.call(row, k) && String(k).toLowerCase() === snake) return row[k];
 	}
 	return "";
+}
+
+function analyticsProductId(product) {
+	return mapValue(product, "productId") || mapValue(product, "id");
+}
+
+function analyticsProductName(product) {
+	return mapValue(product, "productName") || mapValue(product, "name") || "未命名商品";
+}
+
+function analyticsProducts(data) {
+	return (data && data.products) || [];
+}
+
+function analyticsReviewsForProduct(data, product) {
+	var productName = analyticsProductName(product);
+	return ((data && data.recentReviews) || []).filter(function(review) {
+		var reviewProductId = mapValue(review, "productId");
+		if (reviewProductId) return String(reviewProductId) === String(analyticsProductId(product));
+		return String(mapValue(review, "productName") || "") === String(productName);
+	});
 }
 
 function renderAnalyticsCards(summary, cards) {
@@ -2221,49 +2439,69 @@ function renderAnalyticsCards(summary, cards) {
 
 function renderProductAnalyticsRows(products) {
 	return (products || []).map(function(p) {
-		return '<tr><td>' + escapeHtml(mapValue(p, "id")) + '</td><td><b>' + escapeHtml(mapValue(p, "name")) + '</b><p class="muted">' + escapeHtml(mapValue(p, "categoryName")) + '</p></td><td>' + money(mapValue(p, "price")) + '</td><td>' + escapeHtml(mapValue(p, "stock")) + '</td><td>' + escapeHtml(mapValue(p, "sales")) + '</td><td>' + Number(mapValue(p, "averageRating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(p, "reviewCount") || 0) + '</td><td>' + escapeHtml(mapValue(p, "favoriteCount") || 0) + '</td></tr>';
-	}).join("") || '<tr><td colspan="8">暂无商品分析数据。</td></tr>';
+		var id = analyticsProductId(p);
+		return '<tr><td>' + escapeHtml(id) + '</td><td><b>' + escapeHtml(analyticsProductName(p)) + '</b><p class="muted">' + escapeHtml(mapValue(p, "categoryName") || mapValue(p, "shopName")) + '</p></td><td>' + money(mapValue(p, "price")) + '</td><td>' + escapeHtml(mapValue(p, "stock")) + '</td><td>' + escapeHtml(mapValue(p, "sales")) + '</td><td>' + Number(mapValue(p, "averageRating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(p, "reviewCount") || 0) + '</td><td>' + escapeHtml(mapValue(p, "favoriteCount") || 0) + '</td><td><button class="ghost-btn analytics-product-detail" data-id="' + escapeHtml(id) + '" type="button">查看详情</button></td></tr>';
+	}).join("") || '<tr><td colspan="9">暂无商品分析数据。</td></tr>';
+}
+
+function renderAnalyticsProductDetailModal(data) {
+	var productId = state.analyticsDetailProductId;
+	if (!productId) return "";
+	var product = analyticsProducts(data).filter(function(item) { return String(analyticsProductId(item)) === String(productId); })[0];
+	if (!product) return "";
+	var reviews = analyticsReviewsForProduct(data, product);
+	var reviewRows = reviews.map(function(r) {
+		return '<tr><td>★ ' + Number(mapValue(r, "rating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(r, "username") || "匿名用户") + '</td><td>' + escapeHtml(mapValue(r, "content") || "未填写文字评价") + '</td><td>' + escapeHtml(shortDate(mapValue(r, "createTime"))) + '</td></tr>';
+	}).join("") || '<tr><td colspan="4">该商品暂无近期评价。</td></tr>';
+	return '<div class="analytics-modal-backdrop"><section class="panel-card analytics-product-modal"><div class="section-head compact-head"><div><h3>' + escapeHtml(analyticsProductName(product)) + '</h3><p>' + escapeHtml(mapValue(product, "categoryName") || mapValue(product, "shopName") || "商品表现详情") + '</p></div><button class="ghost-btn analytics-modal-close" type="button">关闭</button></div><div class="analytics-detail-metrics"><div><b>' + money(mapValue(product, "price")) + '</b><span>价格</span></div><div><b>' + escapeHtml(mapValue(product, "stock") || 0) + '</b><span>库存</span></div><div><b>' + escapeHtml(mapValue(product, "sales") || 0) + '</b><span>销量</span></div><div><b>' + Number(mapValue(product, "averageRating") || 0).toFixed(1) + '</b><span>评分</span></div><div><b>' + escapeHtml(mapValue(product, "reviewCount") || 0) + '</b><span>评论</span></div><div><b>' + escapeHtml(mapValue(product, "favoriteCount") || 0) + '</b><span>收藏</span></div></div><div class="section-head compact-head analytics-review-head"><div><h3>商品评价</h3><p>这里直接展示该商品的近期评价，商家无需再到单独模块查找。</p></div></div><div class="admin-table analytics-review-table"><table><thead><tr><th>评分</th><th>用户</th><th>内容</th><th>时间</th></tr></thead><tbody>' + reviewRows + '</tbody></table></div></section></div>';
 }
 
 function renderMerchantAnalytics() {
 	var data = state.merchantAnalytics || {};
 	var summary = data.summary || {};
-	var reviews = (data.recentReviews || []).map(function(r) {
-		return '<tr><td>' + escapeHtml(mapValue(r, "productName")) + '</td><td>★ ' + Number(mapValue(r, "rating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(r, "username")) + '</td><td>' + escapeHtml(mapValue(r, "content")) + '</td><td>' + escapeHtml(shortDate(mapValue(r, "createTime"))) + '</td></tr>';
-	}).join("") || '<tr><td colspan="5">暂无近期评价。</td></tr>';
 	return renderAnalyticsCards(summary, [
 		{ key: "productCount", label: "商品数", icon: "品" },
 		{ key: "orderCount", label: "订单数", icon: "单" },
 		{ key: "salesAmount", label: "销售额", icon: "额", money: true },
-		{ key: "avgRating", label: "店铺星级", icon: "星", rating: true },
+		{ key: "shopRating", label: "店铺星级", icon: "星", rating: true },
 		{ key: "reviewCount", label: "评价数", icon: "评" },
 		{ key: "favoriteCount", label: "收藏数", icon: "藏" }
-	]) + '<section class="panel-card admin-section"><div class="section-head"><div><h2>商品表现</h2><p>按销量、评分、收藏和评论综合查看本店商品表现。</p></div></div><div class="admin-table"><table><thead><tr><th>ID</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' +
-		'<section class="panel-card admin-section"><div class="section-head"><div><h2>近期评价</h2><p>用户评价会影响商品排序和店铺星级。</p></div></div><div class="admin-table"><table><thead><tr><th>商品</th><th>评分</th><th>用户</th><th>内容</th><th>时间</th></tr></thead><tbody>' + reviews + '</tbody></table></div></section>';
+	]) + '<section class="panel-card admin-section"><div class="section-head"><div><h2>商品表现</h2><p>销量、评分、收藏和评论都来自真实用户操作；点击详情可查看该商品评价。</p></div></div><div class="admin-table analytics-products-table"><table><thead><tr><th>ID</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th><th>操作</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' + renderAnalyticsProductDetailModal(data);
 }
 
 function renderAdminAnalytics() {
 	var data = state.adminAnalytics || {};
 	var summary = data.summary || {};
 	var shops = (data.shops || []).map(function(s) {
-		return '<tr><td>' + escapeHtml(mapValue(s, "merchantId")) + '</td><td><b>' + escapeHtml(mapValue(s, "shopName")) + '</b><p class="muted">' + escapeHtml(mapValue(s, "merchantName")) + '</p></td><td>' + escapeHtml(mapValue(s, "productCount") || 0) + '</td><td>' + escapeHtml(mapValue(s, "sales") || 0) + '</td><td>' + Number(mapValue(s, "avgRating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(s, "reviewCount") || 0) + '</td><td>' + escapeHtml(mapValue(s, "favoriteCount") || 0) + '</td></tr>';
+		return '<tr><td>' + escapeHtml(mapValue(s, "merchantId")) + '</td><td><b>' + escapeHtml(mapValue(s, "shopName")) + '</b><p class="muted">' + escapeHtml(mapValue(s, "merchantName")) + '</p></td><td>' + escapeHtml(mapValue(s, "productCount") || 0) + '</td><td>' + escapeHtml(mapValue(s, "totalSales") || 0) + '</td><td>' + Number(mapValue(s, "shopRating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(s, "reviewCount") || 0) + '</td><td>' + escapeHtml(mapValue(s, "favoriteCount") || 0) + '</td></tr>';
 	}).join("") || '<tr><td colspan="7">暂无店铺分析数据。</td></tr>';
 	return renderAnalyticsCards(summary, [
 		{ key: "productCount", label: "平台商品", icon: "品" },
 		{ key: "orderCount", label: "平台订单", icon: "单" },
 		{ key: "salesAmount", label: "平台销售额", icon: "额", money: true },
-		{ key: "avgRating", label: "平均评分", icon: "星", rating: true },
+		{ key: "shopRating", label: "平均评分", icon: "星", rating: true },
 		{ key: "reviewCount", label: "评价总数", icon: "评" },
 		{ key: "favoriteCount", label: "收藏总数", icon: "藏" }
 	]) + '<section class="panel-card admin-section"><div class="section-head"><div><h2>店铺分析</h2><p>按店铺汇总销量、评分、收藏和评论。</p></div></div><div class="admin-table"><table><thead><tr><th>商家ID</th><th>店铺</th><th>商品</th><th>销量</th><th>星级</th><th>评论</th><th>收藏</th></tr></thead><tbody>' + shops + '</tbody></table></div></section>' +
-		'<section class="panel-card admin-section"><div class="section-head"><div><h2>商品排行</h2><p>后台用于观察首页智能入口排序效果。</p></div></div><div class="admin-table"><table><thead><tr><th>ID</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>';
+		'<section class="panel-card admin-section"><div class="section-head"><div><h2>商品排行</h2><p>后台用于观察首页智能入口排序效果。</p></div></div><div class="admin-table analytics-products-table"><table><thead><tr><th>ID</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th><th>操作</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' + renderAnalyticsProductDetailModal(data);
 }
 
 function renderMerchantProductList() {
 	var rows = state.merchantProducts.map(function(p) {
-		return '<tr><td>' + p.id + '</td><td>' + productThumb(p, "merchant-list-thumb") + '</td><td><b>' + escapeHtml(p.name) + '</b><p class="muted">' + escapeHtml(p.shortDesc) + '</p></td><td>' + escapeHtml(p.categoryName) + '</td><td>' + money(p.price) + '</td><td>' + p.stock + '</td><td>' + p.sales + '</td><td>' + badge(statusText(p.saleStatus), p.saleStatus === "ON_SALE" ? "green" : "amber") + '</td><td>' + badge(statusText(p.auditStatus), p.auditStatus === "APPROVED" ? "green" : (p.auditStatus === "REJECTED" ? "amber" : "")) + '<p class="muted">' + escapeHtml(p.auditOpinion || "") + '</p></td><td><button class="ghost-btn merchant-edit" data-id="' + p.id + '" type="button">编辑</button><button class="ghost-btn merchant-submit" data-id="' + p.id + '" type="button">提交审核</button><button class="ghost-btn merchant-offsale" data-id="' + p.id + '" type="button">下架</button></td></tr>';
+		return '<tr><td>' + p.id + '</td><td>' + productThumb(p, "merchant-list-thumb") + '</td><td><b>' + escapeHtml(p.name) + '</b><p class="muted">' + escapeHtml(p.shortDesc) + '</p></td><td>' + escapeHtml(p.categoryName) + '</td><td>' + money(p.price) + '</td><td>' + p.stock + '</td><td>' + p.sales + '</td><td>' + badge(statusText(p.saleStatus), p.saleStatus === "ON_SALE" ? "green" : "amber") + '</td><td>' + badge(statusText(p.auditStatus), p.auditStatus === "APPROVED" ? "green" : (p.auditStatus === "REJECTED" ? "amber" : "")) + '<p class="muted">' + escapeHtml(p.auditOpinion || "") + '</p></td><td>' + merchantProductListActions(p) + '</td></tr>';
 	}).join("") || '<tr><td colspan="10">暂无商品，请先新增商品。</td></tr>';
 	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>商家商品列表</h2><p>商家只能管理自己发布的商品。</p></div><button class="primary-btn merchant-add-product" data-page="merchantProductAdd" type="button">新增商品</button></div><div class="admin-table merchant-product-list-table"><table><thead><tr><th>ID</th><th>图片</th><th>商品</th><th>分类</th><th>价格</th><th>库存</th><th>销量</th><th>销售</th><th>审核</th><th>操作</th></tr></thead><tbody>' + rows + '</tbody></table></div></section>';
+}
+
+function merchantProductListActions(product) {
+	var onSaleRestricted = !!restrictionFor(state.merchant, "can_on_sale_product");
+	var onSale = product.saleStatus === "ON_SALE";
+	var pending = product.auditStatus === "PENDING";
+	var onSaleDisabled = onSale || onSaleRestricted;
+	var offSaleDisabled = !onSale;
+	var title = onSaleRestricted ? ' title="' + escapeHtml(restrictionHint(state.merchant, "can_on_sale_product")) + '"' : "";
+	var auditBtn = onSaleRestricted ? '<button class="ghost-btn merchant-submit-audit" data-id="' + product.id + '" type="button" ' + (pending ? "disabled" : "") + '>提交审核</button>' : "";
+	return '<div class="merchant-row-actions merchant-product-list-actions"><button class="ghost-btn merchant-edit" data-id="' + product.id + '" type="button">编辑</button><button class="ghost-btn merchant-onsale" data-id="' + product.id + '" type="button" ' + (onSaleDisabled ? "disabled" : "") + title + '>上架</button><button class="ghost-btn merchant-offsale" data-id="' + product.id + '" type="button" ' + (offSaleDisabled ? "disabled" : "") + '>下架</button>' + auditBtn + '</div>';
 }
 
 function optionListText(value, fallback) {
@@ -2709,7 +2947,7 @@ function renderAdminMerchantAudit() {
 		var toggleStatus = m.status === "DISABLED" ? "APPROVED" : "DISABLED";
 		var toggleText = m.status === "DISABLED" ? "启用" : "禁用";
 		var row = '<tr><td><b>' + escapeHtml(m.merchantCode) + '</b></td>' +
-			'<td><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="merchantName" value="' + escapeHtml(m.merchantName || "") + '"><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="shopName" value="' + escapeHtml(m.shopName || "") + '" placeholder="店铺名称"></td>' +			'<td><div class="password-cell"><input class="admin-input merchant-field merchant-password-input" data-id="' + m.merchantId + '" data-field="password" type="password" value="' + escapeHtml(m.registerPasswordDemo || "") + '"><button class="ghost-btn password-toggle" data-id="' + m.merchantId + '" type="button">显示</button></div></td>' +
+			'<td><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="merchantName" value="' + escapeHtml(m.merchantName || "") + '"><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="shopName" value="' + escapeHtml(m.shopName || "") + '" placeholder="店铺名称"></td>' +			'<td><div class="password-cell"><input class="admin-input merchant-field merchant-password-input" data-id="' + m.merchantId + '" data-field="password" type="password" value="' + escapeHtml(m.registerPasswordDemo || "") + '"></div></td>' +
 			'<td><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="contactPhone" value="' + escapeHtml(m.contactPhone || "") + '"><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="email" value="' + escapeHtml(m.email || "") + '" placeholder="邮箱"></td>' +
 			'<td><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="businessCategory" value="' + escapeHtml(m.businessCategory || "") + '"><input class="admin-input merchant-field" data-id="' + m.merchantId + '" data-field="businessAddress" value="' + escapeHtml(m.businessAddress || "") + '" placeholder="经营地址"></td>' +
 			'<td>' + badge(statusText(m.status), merchantStatusTone(m.status)) + (m.punishReason ? '<p class="muted">' + escapeHtml(m.punishReason) + '</p>' : '') + '</td><td><b>' + stats.total + '</b></td><td>' + stats.onSale + '</td><td>' + stats.offSale + '</td><td>' + stats.pending + '<p class="muted">待处理</p></td>' +			'<td><div class="merchant-action-group"><button class="primary-btn merchant-save" data-id="' + m.merchantId + '" type="button">保存资料</button><button class="ghost-btn merchant-audit" data-id="' + m.merchantId + '" data-status="' + toggleStatus + '" type="button">' + toggleText + '</button><button class="ghost-btn merchant-products-toggle" data-id="' + m.merchantId + '" type="button">' + (expanded ? "收起商品" : "查看/管理商品") + '</button></div></td></tr>';
@@ -2860,9 +3098,7 @@ function renderAdminUserTabs() {
 }
 
 function renderAdminUserBasic(user) {
-	var visible = !!state.adminUserPasswordVisible[user.id];
-	var passwordText = visible ? (user.currentPassword || "") : "&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;&#8226;";
-	return '<div class="admin-user-form"><label class="field"><span>用户名</span><input class="admin-input" id="adminUserName" value="' + escapeHtml(user.username) + '"></label><label class="field"><span>手机号</span><input class="admin-input" id="adminUserPhone" value="' + escapeHtml(user.phone || "") + '"></label><label class="field"><span>邮箱</span><input class="admin-input" id="adminUserEmail" value="' + escapeHtml(user.email || "") + '"></label><label class="field"><span>当前密码</span><div class="admin-password-view"><code>' + (visible ? escapeHtml(passwordText) : passwordText) + '</code><button class="ghost-btn admin-user-password-toggle ' + (visible ? "visible" : "") + '" data-id="' + user.id + '" type="button" title="' + (visible ? "隐藏当前密码" : "显示当前密码") + '" aria-label="' + (visible ? "隐藏当前密码" : "显示当前密码") + '"><span class="eye-icon" aria-hidden="true"></span></button></div></label><label class="field"><span>新密码</span><input class="admin-input" id="adminUserPassword" type="password" placeholder="留空则不修改"></label><label class="field"><span>状态</span><select class="admin-input" id="adminUserStatus"><option ' + (user.status === "正常" ? "selected" : "") + '>正常</option><option ' + (user.status === "冻结" ? "selected" : "") + '>冻结</option><option ' + (user.status === "停用" ? "selected" : "") + '>停用</option><option ' + (user.status === "封禁" ? "selected" : "") + '>封禁</option></select></label>' + (user.punishReason ? '<p class="muted wide">处罚原因：' + escapeHtml(user.punishReason) + (user.punishEndTime ? '，预计恢复：' + escapeHtml((user.punishEndTime || "").slice(0, 19)) : '') + '</p>' : '') + '<div class="profile-metrics"><div><b>' + adminUserOrders(user.id).length + '</b><span>订单</span></div><div><b>' + money(adminUserSpend(user.id)) + '</b><span>消费</span></div><div><b>' + adminUserCoupons(user.id).length + '</b><span>优惠券</span></div></div><button class="primary-btn admin-user-save" data-id="' + user.id + '" type="button">保存基础信息</button></div>';
+	return '<div class="admin-user-form"><label class="field"><span>用户名</span><input class="admin-input" id="adminUserName" value="' + escapeHtml(user.username) + '"></label><label class="field"><span>手机号</span><input class="admin-input" id="adminUserPhone" value="' + escapeHtml(user.phone || "") + '"></label><label class="field"><span>邮箱</span><input class="admin-input" id="adminUserEmail" value="' + escapeHtml(user.email || "") + '"></label><label class="field"><span>当前密码</span><input class="admin-input admin-current-password" type="password" readonly value="' + escapeHtml(user.currentPassword || "") + '"></label><label class="field"><span>新密码</span><input class="admin-input" id="adminUserPassword" type="password" placeholder="留空则不修改"></label><label class="field"><span>状态</span><select class="admin-input" id="adminUserStatus"><option ' + (user.status === "正常" ? "selected" : "") + '>正常</option><option ' + (user.status === "冻结" ? "selected" : "") + '>冻结</option><option ' + (user.status === "停用" ? "selected" : "") + '>停用</option><option ' + (user.status === "封禁" ? "selected" : "") + '>封禁</option></select></label>' + (user.punishReason ? '<p class="muted wide">处罚原因：' + escapeHtml(user.punishReason) + (user.punishEndTime ? '，预计恢复：' + escapeHtml((user.punishEndTime || "").slice(0, 19)) : '') + '</p>' : '') + '<div class="profile-metrics"><div><b>' + adminUserOrders(user.id).length + '</b><span>订单</span></div><div><b>' + money(adminUserSpend(user.id)) + '</b><span>消费</span></div><div><b>' + adminUserCoupons(user.id).length + '</b><span>优惠券</span></div></div><button class="primary-btn admin-user-save" data-id="' + user.id + '" type="button">保存基础信息</button></div>';
 }
 
 function renderAdminUserOrderItems(order) {
@@ -3115,13 +3351,13 @@ function renderAdminReportPager() {
 
 function renderReports() {
 	if (!state.user && !state.merchant) return '<div class="empty-cart"><h3>请先登录</h3><p class="muted">登录后可以查看自己提交的举报。</p></div>';
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>我的举报</h2><p>这里展示你提交给平台处理的举报及最新处理意见。</p></div></div>' + renderReportTable(state.reports, false, "暂无举报记录。") + '</section>';
+	return '<section class="panel-card admin-section report-review-page"><div class="section-head"><div><h2>我的举报</h2><p>这里展示你提交给平台处理的举报及最新处理意见。</p></div></div>' + renderReportTable(state.reports, false, "暂无举报记录。") + '</section>';
 }
 
 function renderMerchantReports() {
 	var my = renderReportTable(state.merchantMyReports, false, "暂无我提交的举报。");
 	var related = renderReportTable(state.merchantRelatedReports, false, "暂无涉及本店的举报。");
-	return '<section class="panel-card admin-section"><div class="section-head"><div><h2>举报管理</h2><p>商家可查看自己提交的举报，以及用户举报本店、商品、订单或评价的处理进度。</p></div></div><div class="report-split"><section><h3>我提交的举报</h3>' + my + '</section><section><h3>涉及本店的举报</h3>' + related + '</section></div></section>';
+	return '<section class="panel-card admin-section report-review-page"><div class="section-head"><div><h2>举报管理</h2><p>商家可查看自己提交的举报，以及用户举报本店、商品、订单或评价的处理进度。</p></div></div><div class="report-split"><section><h3>我提交的举报</h3>' + my + '</section><section><h3>涉及本店的举报</h3>' + related + '</section></div></section>';
 }
 
 function renderAdminReports() {
@@ -3247,7 +3483,8 @@ function bindChatEvents() {
 			post("friends", { action: btn.getAttribute("data-action"), requestId: btn.getAttribute("data-id") }).then(function(data) {
 				if (!data.success) { alert(data.message || "处理好友申请失败"); return; }
 				showToast(btn.getAttribute("data-action") === "accept" ? "已添加好友" : "已拒绝好友申请");
-				loadConversationMessages(state.activeConversationId).then(renderPage);
+				state.friendRequests = data.requests || [];
+				loadMessages().then(renderPage);
 			});
 		};
 	});
@@ -3748,6 +3985,19 @@ function bindPageActions() {
 	Array.prototype.forEach.call(document.querySelectorAll(".view-detail,.visual-open"), function(btn) {
 		btn.onclick = function() { openDetail(Number(btn.getAttribute("data-id")), state.page || "home"); };
 	});
+	Array.prototype.forEach.call(document.querySelectorAll(".analytics-product-detail"), function(btn) {
+		btn.onclick = function() {
+			state.analyticsDetailProductId = btn.getAttribute("data-id");
+			renderPage();
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".analytics-modal-close,.analytics-modal-backdrop"), function(el) {
+		el.onclick = function(e) {
+			if (el.classList.contains("analytics-modal-backdrop") && e.target !== el) return;
+			state.analyticsDetailProductId = null;
+			renderPage();
+		};
+	});
     Array.prototype.forEach.call(document.querySelectorAll(".product-media-thumb"), function(btn) {
         btn.onclick = function() {
             state.detailMediaIndex = Number(btn.getAttribute("data-index") || 0);
@@ -4080,9 +4330,21 @@ function bindPageActions() {
 				if (!avatarFile.files || !avatarFile.files[0]) return;
 				var hint = document.getElementById("accountAvatarHint");
 				var hidden = document.getElementById("accountRequestAttachment");
+				var preview = document.getElementById("accountAvatarPreview");
+				var directAvatar = accountForm.getAttribute("data-setting-action") === "avatar";
+				if (hidden) hidden.value = "";
+				if (directAvatar) {
+					accountForm._avatarBlob = null;
+					openAvatarCropper(avatarFile.files[0], function(blob, croppedUrl, fileName) {
+						accountForm._avatarBlob = blob;
+						accountForm._avatarFileName = fileName;
+						if (preview) preview.innerHTML = '<img src="' + croppedUrl + '" alt="">';
+						if (hint) hint.textContent = "已截取方形头像，点击保存后更新头像。";
+					});
+					return;
+				}
 				var progress = document.getElementById("avatarUploadProgress");
 				var bar = progress ? progress.querySelector("i") : null;
-				if (hidden) hidden.value = "";
 				if (progress) progress.classList.add("show");
 				if (bar) bar.style.width = "0%";
 				if (hint) hint.textContent = "头像正在上传：" + avatarFile.files[0].name;
@@ -4124,6 +4386,48 @@ function bindPageActions() {
 					var el = document.getElementById(id);
 					return el ? el.value : (fallback || "");
 				};
+				if (settingAction === "avatar") {
+					var avatarInput = document.getElementById("accountAvatarFile");
+					var hint = document.getElementById("accountAvatarHint");
+					var progress = document.getElementById("avatarUploadProgress");
+					var bar = progress ? progress.querySelector("i") : null;
+					var saveBtn = accountForm.querySelector(".account-avatar-save");
+					if (!accountForm._avatarBlob) {
+						alert("请先选择图片并确认截取区域。");
+						return;
+					}
+					if (saveBtn) saveBtn.disabled = true;
+					if (progress) progress.classList.add("show");
+					if (bar) bar.style.width = "0%";
+					if (hint) hint.textContent = "头像正在保存：" + (accountForm._avatarFileName || "avatar.png");
+					var avatarFormData = new FormData();
+					avatarFormData.append("avatar", accountForm._avatarBlob, accountForm._avatarFileName || "avatar.png");
+					uploadFormData("avatarUpload", avatarFormData, function(percent) {
+						if (bar) bar.style.width = percent + "%";
+						if (hint) hint.textContent = "头像正在保存：" + (accountForm._avatarFileName || "avatar.png") + "（" + percent + "%）";
+					}).then(function(data) {
+						if (saveBtn) saveBtn.disabled = false;
+						if (!data.success) {
+							if (hint) hint.textContent = "保存失败：" + (data.message || "请重新选择图片");
+							alert(data.message || "头像保存失败");
+							return;
+						}
+						if (bar) bar.style.width = "100%";
+						if (data.user) state.user = data.user;
+						if (data.merchant) state.merchant = data.merchant;
+						var preview = document.getElementById("accountAvatarPreview");
+						if (preview) preview.innerHTML = '<img src="' + escapeHtml(data.avatarUrl || "") + '" alt="">';
+						if (hint) hint.textContent = "头像已保存。";
+						showToast("头像已保存");
+						renderNav();
+						renderPage();
+					}).catch(function() {
+						if (saveBtn) saveBtn.disabled = false;
+						if (hint) hint.textContent = "保存失败：接口未响应";
+						alert("头像保存失败，请重新登录或检查图片格式。");
+					});
+					return;
+				}
 				if (state.user) {
 					payload.username = valueOf("profileUsername", state.user.username || "");
 					payload.phone = valueOf("profilePhone", state.user.phone || "");
@@ -4135,15 +4439,19 @@ function bindPageActions() {
 						return;
 					}
 				} else if (state.merchant) {
-					payload.merchantName = document.getElementById("merchantProfileName").value;
-					payload.shopName = document.getElementById("merchantProfileShopName").value;
-					payload.contactName = document.getElementById("merchantProfileContactName").value;
-					payload.contactPhone = document.getElementById("merchantProfileContactPhone").value;
-					payload.email = document.getElementById("merchantProfileEmail").value;
-					payload.businessCategory = document.getElementById("merchantProfileCategory").value;
-					payload.businessAddress = document.getElementById("merchantProfileAddress").value;
-					payload.shopDesc = document.getElementById("merchantProfileDesc").value;
-					payload.password = document.getElementById("merchantProfilePassword").value;
+					payload.merchantName = valueOf("merchantProfileName", state.merchant.merchantName || "");
+					payload.shopName = valueOf("merchantProfileShopName", state.merchant.shopName || "");
+					payload.contactName = valueOf("merchantProfileContactName", state.merchant.contactName || "");
+					payload.contactPhone = valueOf("merchantProfileContactPhone", state.merchant.contactPhone || "");
+					payload.email = valueOf("merchantProfileEmail", state.merchant.email || "");
+					payload.businessCategory = valueOf("merchantProfileCategory", state.merchant.businessCategory || "");
+					payload.businessAddress = valueOf("merchantProfileAddress", state.merchant.businessAddress || "");
+					payload.shopDesc = valueOf("merchantProfileDesc", state.merchant.shopDesc || "");
+					payload.password = settingAction === "merchantPassword" ? valueOf("merchantProfilePassword", "") : "";
+					if (settingAction === "merchantPassword" && !payload.password) {
+						alert("请填写新密码。");
+						return;
+					}
 				}
 				post("accountRequests", payload).then(function(data) {
 					if (!data.success) { alert(data.message || "保存失败"); return; }
@@ -4720,6 +5028,19 @@ function bindPageActions() {
 			renderPage();
 		};
 	});
+	Array.prototype.forEach.call(document.querySelectorAll(".merchant-settings-card"), function(btn) {
+		if (btn.disabled) return;
+		btn.onclick = function() {
+			state.merchantSettingsPanel = btn.getAttribute("data-merchant-setting") || "";
+			renderPage();
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".merchant-settings-back"), function(btn) {
+		btn.onclick = function() {
+			state.merchantSettingsPanel = "";
+			renderPage();
+		};
+	});
 	Array.prototype.forEach.call(document.querySelectorAll(".profile-link"), function(btn) {
 		btn.onclick = function() {
 			var page = btn.getAttribute("data-page");
@@ -4831,14 +5152,6 @@ function bindPageActions() {
 				showToast("用户已删除");
 				renderPage();
 			});
-		};
-	});
-	Array.prototype.forEach.call(document.querySelectorAll(".admin-user-password-toggle"), function(btn) {
-		btn.onclick = function(e) {
-			if (e) e.stopPropagation();
-			var id = btn.getAttribute("data-id");
-			state.adminUserPasswordVisible[id] = !state.adminUserPasswordVisible[id];
-			renderPage();
 		};
 	});
 	Array.prototype.forEach.call(document.querySelectorAll(".admin-user-tab"), function(btn) {
@@ -5000,10 +5313,12 @@ function bindPageActions() {
 			bindPageActions();
 		};
 	});
-	Array.prototype.forEach.call(document.querySelectorAll(".merchant-submit,.merchant-offsale"), function(btn) {
+	Array.prototype.forEach.call(document.querySelectorAll(".merchant-onsale,.merchant-offsale,.merchant-submit-audit"), function(btn) {
 		btn.onclick = function() {
-			post("merchant/products", { action: btn.classList.contains("merchant-submit") ? "submit" : "offSale", productId: btn.getAttribute("data-id") }).then(function(data) {
+			var action = btn.classList.contains("merchant-offsale") ? "offSale" : (btn.classList.contains("merchant-submit-audit") ? "submitAudit" : "submit");
+			post("merchant/products", { action: action, productId: btn.getAttribute("data-id") }).then(function(data) {
 				if (!data.success) { alert(data.message || "操作失败"); return; }
+				if (data.merchant) state.merchant = data.merchant;
 				state.merchantProducts = data.products || [];
 				renderPage();
 			});
@@ -5165,15 +5480,6 @@ function bindPageActions() {
 			var id = btn.getAttribute("data-id");
 			state.merchantExpandedId = String(state.merchantExpandedId || "") === String(id) ? null : id;
 			renderPage();
-		};
-	});
-	Array.prototype.forEach.call(document.querySelectorAll(".password-toggle"), function(btn) {
-		btn.onclick = function() {
-			var input = document.querySelector('.merchant-password-input[data-id="' + btn.getAttribute("data-id") + '"]');
-			if (!input) return;
-			var visible = input.type === "text";
-			input.type = visible ? "password" : "text";
-			btn.textContent = visible ? "显示" : "隐藏";
 		};
 	});
 	Array.prototype.forEach.call(document.querySelectorAll(".coupon-center-tab"), function(btn) {
@@ -5835,15 +6141,8 @@ document.getElementById("vipEntryBtn").onclick = function() {
 };
 
 document.getElementById("searchInput").oninput = function() {
+	if (!globalSearchEnabled()) return;
 	state.searchKeyword = this.value;
-	if (state.admin) {
-		renderPage();
-		return;
-	}
-	if (state.page !== "home") {
-		setPage("home");
-		return;
-	}
 	renderPage();
 };
 
