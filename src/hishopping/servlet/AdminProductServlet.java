@@ -24,6 +24,7 @@ public class AdminProductServlet extends HttpServlet {
         }
         Map<String, Object> result = new LinkedHashMap<String, Object>();
         result.put("success", true);
+        result.put("categories", ServletUtil.categories(productService.categories()));
         result.put("products", ServletUtil.products(productService.adminProducts()));
         JsonUtil.write(response, result);
     }
@@ -36,6 +37,7 @@ public class AdminProductServlet extends HttpServlet {
         request.setCharacterEncoding("UTF-8");
         productService.changeStatus(ServletUtil.intParam(request, "productId", 0), request.getParameter("status"));
         Map<String, Object> result = ServletUtil.ok();
+        result.put("categories", ServletUtil.categories(productService.categories()));
         result.put("products", ServletUtil.products(productService.adminProducts()));
         JsonUtil.write(response, result);
     }

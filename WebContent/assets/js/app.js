@@ -17,6 +17,10 @@ var state = {
 	detailQuantity: 1,
 	detailMediaIndex: 0,
 	searchKeyword: "",
+	searchFocused: false,
+	searchDropdownOpen: false,
+	selectedCategoryName: "",
+	recentSearches: [],
 	cart: [],
 	selectedCartItemIds: {},
 	orders: [],
@@ -26,6 +30,7 @@ var state = {
 	adminUserCoupons: [],
 	merchants: [],
 	merchantProducts: [],
+	merchantEditingProductId: null,
 	merchantOrders: [],
 	merchantOrderStatusFilter: "all",
 	adminAuditProducts: [],
@@ -70,6 +75,7 @@ var state = {
 	activeReviewReplyId: null,
 	merchantAnalytics: null,
 	adminAnalytics: null,
+	adminAnalyticsError: "",
 	analyticsDetailProductId: null,
 	merchantAuditFilter: "pending",
 	merchantManageSearch: "",
@@ -114,6 +120,43 @@ var state = {
 
 var apiBasePath = String(window.HISHOPPING_CONTEXT_PATH || "").replace(/\/$/, "");
 
+var defaultSearchCategories = [
+	{ name: "食品生鲜", iconText: "鲜" },
+	{ name: "酒水饮料", iconText: "饮" },
+	{ name: "家用电器", iconText: "电" },
+	{ name: "手机数码", iconText: "数" },
+	{ name: "电脑办公", iconText: "办" },
+	{ name: "家居家装", iconText: "居" },
+	{ name: "家具家纺", iconText: "家" },
+	{ name: "服饰内衣", iconText: "服" },
+	{ name: "鞋靴箱包", iconText: "包" },
+	{ name: "美妆个护", iconText: "美" },
+	{ name: "母婴童装", iconText: "婴" },
+	{ name: "运动户外", iconText: "运" },
+	{ name: "玩具乐器", iconText: "玩" },
+	{ name: "汽车用品", iconText: "车" },
+	{ name: "图书文娱", iconText: "书" },
+	{ name: "宠物用品", iconText: "宠" },
+	{ name: "珠宝饰品", iconText: "饰" },
+	{ name: "鲜花绿植", iconText: "花" },
+	{ name: "厨具餐具", iconText: "厨" },
+	{ name: "清洁纸品", iconText: "洁" },
+	{ name: "医疗健康", iconText: "健" },
+	{ name: "工业五金", iconText: "五" },
+	{ name: "农资园艺", iconText: "农" },
+	{ name: "本地生活", iconText: "生" },
+	{ name: "充值缴费", iconText: "充" },
+	{ name: "虚拟商品", iconText: "虚" },
+	{ name: "游戏道具", iconText: "游" },
+	{ name: "数字内容", iconText: "数" },
+	{ name: "会员服务", iconText: "会" },
+	{ name: "课程教育", iconText: "课" },
+	{ name: "软件工具", iconText: "软" },
+	{ name: "票务卡券", iconText: "票" },
+	{ name: "二手闲置", iconText: "二" },
+	{ name: "其他商品", iconText: "其" }
+];
+
 function apiUrl(url) {
 	url = String(url || "");
 	if (!url || /^(?:[a-z][a-z0-9+.-]*:)?\/\//i.test(url) || url.charAt(0) === "/") return url;
@@ -124,7 +167,18 @@ try {
 	state.couponCenterCollapsed = localStorage.getItem("hishoppingCouponCenterCollapsed") === "1";
 } catch (e) {}
 
+try {
+	state.recentSearches = JSON.parse(localStorage.getItem("hishoppingRecentSearches") || "[]").slice(0, 8);
+} catch (e) {
+	state.recentSearches = [];
+}
+
 document.addEventListener("click", function(e) {
+	if (state.searchDropdownOpen && e.target && e.target.closest && !e.target.closest(".search-box")) {
+		state.searchDropdownOpen = false;
+		state.searchFocused = false;
+		renderSearchDropdown();
+	}
 	if (!state.openMoreMenu) return;
 	if (e.target && e.target.closest && e.target.closest(".more-menu-wrap")) return;
 	state.openMoreMenu = "";
@@ -229,6 +283,9 @@ var pageTitles = {
 	merchantReports: "举报管理",
 	adminReports: "举报管理"
 };
+
+pageTitles.merchantProductAdd = "新增商品";
+pageTitles.merchantProductEdit = "编辑商品";
 
 function activeNavItems() {
 	return state.admin ? adminNavItems : (state.merchant ? merchantNavItems : userNavItems);
@@ -955,8 +1012,167 @@ function sortedCheckoutAddresses() {
 
 function productMatchesSearch(product) {
 	var keyword = state.searchKeyword.trim().toLowerCase();
+	var categoryId = String(state.selectedCategoryId || "all");
+	if (categoryId !== "all") {
+		if (categoryId.indexOf("name:") === 0) {
+			if (String(product.categoryName || "") !== categoryId.substring(5)) return false;
+		} else if (String(product.categoryId) !== categoryId) {
+			return false;
+		}
+	}
 	if (!keyword) return true;
-	return [product.name, product.categoryName, product.shortDesc, product.detailDesc, product.tag].join(" ").toLowerCase().indexOf(keyword) >= 0;
+	return [product.name, product.categoryName, product.shortDesc, product.detailDesc, product.shopName, product.tag].join(" ").toLowerCase().indexOf(keyword) >= 0;
+}
+
+function productVisible(product) {
+	return product && product.status !== "下架" && product.status !== "删除" && product.saleStatus !== "OFF_SALE" && product.auditStatus !== "PENDING";
+}
+
+function selectedCategory() {
+	var categoryId = String(state.selectedCategoryId || "all");
+	if (categoryId === "all") return null;
+	return searchCategories().filter(function(category) {
+		return String(category.id) === categoryId;
+	})[0] || null;
+}
+
+function currentCategoryName() {
+	var category = selectedCategory();
+	return category ? category.name : (state.selectedCategoryName || "");
+}
+
+function searchIsActive() {
+	return String(state.selectedCategoryId || "all") !== "all" || !!state.searchKeyword.trim();
+}
+
+function persistRecentSearches() {
+	try {
+		localStorage.setItem("hishoppingRecentSearches", JSON.stringify((state.recentSearches || []).slice(0, 8)));
+	} catch (e) {}
+}
+
+function rememberSearch(keyword) {
+	keyword = String(keyword || "").trim();
+	if (!keyword) return;
+	var normalized = keyword.toLowerCase();
+	state.recentSearches = [keyword].concat((state.recentSearches || []).filter(function(item) {
+		return String(item || "").toLowerCase() !== normalized;
+	})).slice(0, 8);
+	persistRecentSearches();
+}
+
+function hotSearchCategories() {
+	var hotNames = ["食品生鲜", "手机数码", "服饰内衣", "美妆个护", "游戏道具", "虚拟商品"];
+	return hotNames.map(function(name) {
+		return searchCategories().filter(function(category) { return category.name === name; })[0];
+	}).filter(Boolean);
+}
+
+function searchCategories() {
+	var rows = [];
+	var seen = {};
+	(state.categories || []).forEach(function(category) {
+		var name = category.name || "";
+		var normalized = name === "食品" ? "食品生鲜" : (name === "图书" ? "图书文娱" : name);
+		if (!normalized || seen[normalized]) return;
+		seen[normalized] = true;
+		rows.push({
+			id: category.id,
+			name: normalized,
+			iconText: category.iconText || (normalized === "食品生鲜" ? "鲜" : (normalized === "图书文娱" ? "书" : "品")),
+			description: category.description || ""
+		});
+	});
+	defaultSearchCategories.forEach(function(category, index) {
+		if (seen[category.name]) return;
+		seen[category.name] = true;
+		rows.push({
+			id: "name:" + category.name,
+			name: category.name,
+			iconText: category.iconText,
+			description: category.description || "",
+			fallback: true,
+			sortNo: index + 1
+		});
+	});
+	return rows;
+}
+
+function searchCategoryChip(category) {
+	var active = String(state.selectedCategoryId || "all") === String(category.id);
+	return '<button class="search-category-chip ' + (active ? "active" : "") + '" data-category="' + category.id + '" data-name="' + escapeHtml(category.name) + '" type="button"><span>' + escapeHtml(category.iconText || "品") + '</span>' + escapeHtml(category.name) + '</button>';
+}
+
+function renderSearchDropdown() {
+	var dropdown = document.getElementById("searchDropdown");
+	if (!dropdown) return;
+	if (!globalSearchEnabled() || !state.searchDropdownOpen) {
+		dropdown.classList.remove("open");
+		dropdown.innerHTML = "";
+		return;
+	}
+	var hot = hotSearchCategories().map(searchCategoryChip).join("");
+	var all = [searchCategoryChip({ id: "all", name: "全部", iconText: "全" })].concat(searchCategories().map(searchCategoryChip)).join("");
+	var recent = (state.recentSearches || []).map(function(item) {
+		return '<button class="recent-search-chip" data-keyword="' + escapeHtml(item) + '" type="button">' + escapeHtml(item) + '</button>';
+	}).join("");
+	var keyword = state.searchKeyword.trim();
+	var current = currentCategoryName();
+	var scope = current ? current + " · " : "";
+	var suggestion = keyword ? '<button class="search-suggestion" type="button" data-keyword="' + escapeHtml(keyword) + '">搜索“' + escapeHtml(scope + keyword) + '”</button>' : "";
+	dropdown.innerHTML =
+		'<div class="search-panel-section"><div class="search-panel-title">热门分类</div><div class="search-chip-row">' + (hot || '<span class="muted">暂无热门分类</span>') + '</div></div>' +
+		'<div class="search-panel-section"><div class="search-panel-title">全部分类</div><div class="search-chip-row all-categories">' + (all || '<span class="muted">分类加载中</span>') + '</div></div>' +
+		'<div class="search-panel-section"><div class="search-panel-title">最近搜索</div><div class="search-chip-row">' + (recent || '<span class="muted">还没有最近搜索</span>') + '</div></div>' +
+		(suggestion ? '<div class="search-panel-section">' + suggestion + '</div>' : '') +
+		'<div class="search-panel-actions"><button class="ghost-btn search-clear-filter" type="button">清除筛选</button><button class="primary-btn search-view-all" type="button">查看全部商品</button></div>';
+	dropdown.classList.add("open");
+}
+
+function openSearchDropdown() {
+	if (!globalSearchEnabled()) return;
+	state.searchFocused = true;
+	state.searchDropdownOpen = true;
+	renderSearchDropdown();
+}
+
+function closeSearchDropdown() {
+	state.searchFocused = false;
+	state.searchDropdownOpen = false;
+	renderSearchDropdown();
+}
+
+function applySearchCategory(categoryId, categoryName) {
+	state.selectedCategoryId = categoryId ? String(categoryId) : "all";
+	state.selectedCategoryName = state.selectedCategoryId === "all" ? "" : (categoryName || currentCategoryName());
+	state.activeFeed = "recommend";
+	state.searchDropdownOpen = false;
+	if (state.page !== "home") {
+		setPage("home");
+	} else {
+		renderPage();
+	}
+	setTimeout(scrollToProductCenter, 80);
+}
+
+function clearSearchFilters(keepDropdown) {
+	state.searchKeyword = "";
+	state.selectedCategoryId = "all";
+	state.selectedCategoryName = "";
+	var input = document.getElementById("searchInput");
+	if (input) input.value = "";
+	if (!keepDropdown) state.searchDropdownOpen = false;
+	renderSearchDropdown();
+	if (state.page === "home") renderPage();
+}
+
+function executeSearch() {
+	var keyword = state.searchKeyword.trim();
+	if (keyword) rememberSearch(keyword);
+	state.searchDropdownOpen = false;
+	if (state.page !== "home") setPage("home");
+	else renderPage();
+	setTimeout(scrollToProductCenter, 80);
 }
 
 function adminMatches(values) {
@@ -1009,10 +1225,12 @@ function updateShellForRole() {
 	if (topbar) topbar.classList.toggle("no-global-search", !showGlobalSearch);
 	if (searchBox) searchBox.classList.toggle("hidden", !showGlobalSearch);
 	if (search) {
-		search.placeholder = "搜索商品名称、分类、描述...";
+		search.placeholder = "搜索商品、店铺、分类、游戏道具、虚拟商品";
 		if (!showGlobalSearch && state.searchKeyword) state.searchKeyword = "";
 		if (search.value !== state.searchKeyword) search.value = state.searchKeyword || "";
 	}
+	if (!showGlobalSearch) state.searchDropdownOpen = false;
+	renderSearchDropdown();
 	updateUserChip();
 }
 
@@ -1127,10 +1345,14 @@ function setPage(page) {
 	if (state.merchant && !isMerchantPage(page)) page = "merchantCenter";
 	if (!state.admin && isAdminPage(page)) page = "home";
 	if (!state.merchant && isMerchantPage(page)) page = "home";
+	if (page === "merchantProductEdit" && !state.merchantEditingProductId) page = "merchantProductList";
+	if (page !== "merchantProductEdit") state.merchantEditingProductId = null;
 	if (page === "merchantProfile") state.merchantSettingsPanel = "";
 	state.page = page;
 	try {
 		sessionStorage.setItem("hishoppingPage", page);
+		if (state.merchantEditingProductId) sessionStorage.setItem("hishoppingMerchantEditProductId", state.merchantEditingProductId);
+		else sessionStorage.removeItem("hishoppingMerchantEditProductId");
 	} catch (e) {
 	}
 	var item = activeNavItems().filter(function(nav) { return nav.key === page; })[0];
@@ -1194,9 +1416,32 @@ function loadProducts() {
 	return get("products?feed=" + encodeURIComponent(state.activeFeed || "recommend")).then(function(data) {
 		if (!data.success) throw new Error(data.message || "商品加载失败");
 		state.categories = data.categories || [];
-		state.products = data.products || [];
+		state.products = dedupeFrontProducts(data.products || []);
 		state.selectedProduct = state.selectedProduct || state.products[0];
 		syncDetailOptions();
+		renderSearchDropdown();
+	});
+}
+
+function frontProductDedupeKey(product) {
+	if (!product) return "";
+	return [
+		product.merchantId || product.merchantCode || product.shopName || "",
+		product.name || "",
+		product.imageUrl || "",
+		Number(product.price || 0).toFixed(2),
+		Number(product.oldPrice || 0).toFixed(2)
+	].join("|").trim().toLowerCase();
+}
+
+function dedupeFrontProducts(products) {
+	var seen = {};
+	return (products || []).filter(function(product) {
+		var key = frontProductDedupeKey(product);
+		if (!key) return true;
+		if (seen[key]) return false;
+		seen[key] = true;
+		return true;
 	});
 }
 
@@ -1237,8 +1482,16 @@ function loadAdminAnalytics() {
 	if (!state.admin) return Promise.resolve();
 	var merchantId = state.adminSelectedMerchantId || 0;
 	return get("admin/analytics?merchantId=" + encodeURIComponent(merchantId)).then(function(data) {
-		if (data.success) state.adminAnalytics = data.analytics || {};
-		else state.adminAnalytics = {};
+		if (data.success) {
+			state.adminAnalytics = data.analytics || {};
+			state.adminAnalyticsError = "";
+		} else {
+			state.adminAnalytics = {};
+			state.adminAnalyticsError = data.message || "数据分析加载失败";
+		}
+	}).catch(function(err) {
+		state.adminAnalytics = {};
+		state.adminAnalyticsError = err.message || "数据分析加载失败";
 	});
 }
 
@@ -1373,7 +1626,10 @@ function loadAdminProducts() {
 		get("admin/accountRequests"),
 		get("admin/reports?action=list&status=all&page=1&pageSize=100")
 	]).then(function(results) {
-		if (results[0].success) state.products = results[0].products || state.products;
+		if (results[0].success) {
+			state.products = results[0].products || state.products;
+			state.categories = results[0].categories || state.categories;
+		}
 		if (results[1].success) {
 			applyAdminUserData(results[1]);
 		}
@@ -1707,13 +1963,23 @@ function renderHallStatsCard() {
 function renderHome() {
 	var feedInfo = activeFeedInfo();
 	var categoryHtml = smartFeeds.map(function(feed) {
-		var active = String(state.activeFeed || "recommend") === feed.key;
+		var active = !searchIsActive() && String(state.activeFeed || "recommend") === feed.key;
 		return '<button class="simple-card category-card smart-feed-card ' + (active ? "selected" : "") + '" data-feed="' + feed.key + '" type="button"><div class="icon-tile"><img src="' + escapeHtml(feed.iconSrc) + '" alt="' + escapeHtml(feed.name) + '"></div><strong>' + escapeHtml(feed.name) + '</strong><span>' + escapeHtml(feed.title) + '</span><small>' + escapeHtml(feed.description) + '</small></button>';
 	}).join("");
 
 	var visibleProducts = state.products.filter(function(p) {
-		return p.status !== "下架" && productMatchesSearch(p);
+		return productVisible(p) && productMatchesSearch(p);
 	});
+	var activeSearch = searchIsActive();
+	var categoryName = currentCategoryName();
+	var keyword = state.searchKeyword.trim();
+	var productTitle = activeSearch ? ((categoryName || "全部商品") + (keyword ? " · 搜索结果" : " · 全部商品")) : feedInfo.title;
+	var productSubtitle = activeSearch
+		? (keyword ? "正在" + (categoryName ? "在“" + categoryName + "”分类下" : "在全部商品中") + "搜索：“" + keyword + "”。" : "当前仅展示“" + categoryName + "”分类下的商品。")
+		: feedInfo.subtitle;
+	var productAction = activeSearch
+		? '<button class="ghost-btn show-all-products" type="button">清除筛选</button>'
+		: '<button class="ghost-btn show-all-products" type="button">刷新推荐</button>';
 	var productHtml = visibleProducts.map(function(product) {
 		return '<article class="product-card">' +
 			'<button class="plain visual-open" data-id="' + product.id + '" type="button">' + productVisual(product) + '</button>' +
@@ -1724,7 +1990,7 @@ function renderHome() {
 			'<div class="price-row"><div><span class="price">' + money(product.price) + '</span><span class="old-price">' + money(product.oldPrice) + '</span></div><span class="rating">★ ' + Number(product.rating || 0).toFixed(1) + '</span></div>' +
 			'<div class="card-actions"><button class="primary-btn add-cart" data-id="' + product.id + '" type="button">加入购物车</button><button class="ghost-btn view-detail" data-id="' + product.id + '" type="button">查看</button></div>' +
 			'</article>';
-	}).join("") || '<div class="empty-cart"><h3>暂无匹配商品</h3><p class="muted">可以换个关键词或切回全部商品继续浏览。</p></div>';
+	}).join("") || '<div class="empty-cart"><h3>' + (categoryName ? "当前分类下没有匹配商品" : "暂无匹配商品") + '</h3><p class="muted">可以清除关键词、切换分类，或回到全部商品继续浏览。</p><button class="ghost-btn show-all-products" type="button">查看全部商品</button></div>';
 	var couponHtml = state.coupons.map(function(coupon) {
 		var button = coupon.claimed ? '<button class="primary-btn use-coupon" data-id="' + coupon.id + '" type="button">去使用</button>' : '<button class="primary-btn claim-coupon" data-id="' + coupon.templateId + '" type="button">领取</button>';
 		return '<article class="coupon-card claimed"><div><strong>' + escapeHtml(coupon.title) + '</strong><span>' + escapeHtml(couponBusinessLabel(coupon) + " · " + (coupon.desc || "")) + '</span><small>' + escapeHtml(coupon.scope || "全场商品可用") + (coupon.expireTime ? " · 有效至 " + escapeHtml(shortDate(coupon.expireTime)) : "") + '</small></div>' + button + '</article>';
@@ -1739,7 +2005,7 @@ function renderHome() {
 		renderHallStatsCard() +
 		'</section><section class="category-grid">' + categoryHtml + '</section>' +
 		'<section class="coupon-strip ' + (couponCollapsed ? "collapsed" : "") + '" id="couponCenter"><div class="section-head coupon-section-head"><div><h3>优惠券中心</h3><p>后台发放后可在购物车结算时选择使用。</p></div><div class="coupon-head-actions">' + claimAllBtn + couponToggleBtn + '</div></div>' + couponPanel + '</section>' +
-		'<section id="productCenter"><div class="section-head"><div><h3>' + escapeHtml(feedInfo.title) + '</h3><p>' + escapeHtml(feedInfo.subtitle) + '</p></div><button class="ghost-btn show-all-products" type="button">刷新推荐</button></div><div class="product-grid">' + productHtml + '</div></section>';
+		'<section id="productCenter"><div class="section-head"><div><h3>' + escapeHtml(productTitle) + '</h3><p>' + escapeHtml(productSubtitle) + '</p></div>' + productAction + '</div><div class="product-grid">' + productHtml + '</div></section>';
 }
 
 function renderProductDisplayAttrs(product) {
@@ -2472,16 +2738,19 @@ function renderMerchantAnalytics() {
 function renderAdminAnalytics() {
 	var data = state.adminAnalytics || {};
 	var summary = data.summary || {};
+	var error = state.adminAnalyticsError ? '<div class="form-message analytics-error">' + escapeHtml(state.adminAnalyticsError) + '</div>' : "";
 	var shops = (data.shops || []).map(function(s) {
 		return '<tr><td>' + escapeHtml(mapValue(s, "merchantId")) + '</td><td><b>' + escapeHtml(mapValue(s, "shopName")) + '</b><p class="muted">' + escapeHtml(mapValue(s, "merchantName")) + '</p></td><td>' + escapeHtml(mapValue(s, "productCount") || 0) + '</td><td>' + escapeHtml(mapValue(s, "totalSales") || 0) + '</td><td>' + Number(mapValue(s, "shopRating") || 0).toFixed(1) + '</td><td>' + escapeHtml(mapValue(s, "reviewCount") || 0) + '</td><td>' + escapeHtml(mapValue(s, "favoriteCount") || 0) + '</td></tr>';
 	}).join("") || '<tr><td colspan="7">暂无店铺分析数据。</td></tr>';
-	return renderAnalyticsCards(summary, [
+	return error + renderAnalyticsCards(summary, [
 		{ key: "productCount", label: "平台商品", icon: "品" },
 		{ key: "orderCount", label: "平台订单", icon: "单" },
 		{ key: "salesAmount", label: "平台销售额", icon: "额", money: true },
 		{ key: "shopRating", label: "平均评分", icon: "星", rating: true },
 		{ key: "reviewCount", label: "评价总数", icon: "评" },
-		{ key: "favoriteCount", label: "收藏总数", icon: "藏" }
+		{ key: "favoriteCount", label: "收藏总数", icon: "藏" },
+		{ key: "merchantCount", label: "店铺总量", icon: "店" },
+		{ key: "userCount", label: "用户总量", icon: "人" }
 	]) + '<section class="panel-card admin-section"><div class="section-head"><div><h2>店铺分析</h2><p>按店铺汇总销量、评分、收藏和评论。</p></div></div><div class="admin-table"><table><thead><tr><th>商家ID</th><th>店铺</th><th>商品</th><th>销量</th><th>星级</th><th>评论</th><th>收藏</th></tr></thead><tbody>' + shops + '</tbody></table></div></section>' +
 		'<section class="panel-card admin-section"><div class="section-head"><div><h2>商品排行</h2><p>后台用于观察首页智能入口排序效果。</p></div></div><div class="admin-table analytics-products-table"><table><thead><tr><th>ID</th><th>商品</th><th>价格</th><th>库存</th><th>销量</th><th>评分</th><th>评论</th><th>收藏</th><th>操作</th></tr></thead><tbody>' + renderProductAnalyticsRows(data.products) + '</tbody></table></div></section>' + renderAnalyticsProductDetailModal(data);
 }
@@ -2845,6 +3114,24 @@ function bindMerchantMediaActions() {
             updateMerchantMedia(mediaList);
         };
     });
+}
+
+function currentMerchantEditingProduct() {
+	var editId = state.merchantEditingProductId;
+	if (!editId) return null;
+	return state.merchantProducts.filter(function(p) {
+		return String(p.id) === String(editId);
+	})[0] || null;
+}
+
+function renderMerchantProductEditPage() {
+	var product = currentMerchantEditingProduct();
+	if (product) return renderMerchantProductForm(product);
+	var loadedProducts = state.merchantProducts && state.merchantProducts.length;
+	if (!loadedProducts) {
+		return '<section class="panel-card admin-section"><div class="empty-cart"><h3>正在加载商品资料</h3><p class="muted">请稍候，编辑表单马上就好。</p></div></section>';
+	}
+	return '<section class="panel-card admin-section"><div class="empty-cart"><h3>未找到该商品</h3><p class="muted">商品可能已删除或不属于当前商家。</p><button class="primary-btn merchant-back-btn" data-page="merchantProductList" type="button">返回列表</button></div></section>';
 }
 
 function renderMerchantProductForm(product) {
@@ -4089,6 +4376,7 @@ function bindPageActions() {
 			var feed = btn.getAttribute("data-feed");
 			if (feed) {
 				state.activeFeed = feed;
+				clearSearchFilters(false);
 				loadProducts().then(renderPage);
 			}
 		};
@@ -4096,7 +4384,47 @@ function bindPageActions() {
 	var showAll = document.querySelector(".show-all-products");
 	if (showAll) {
 		showAll.onclick = function() {
+			if (searchIsActive()) {
+				clearSearchFilters(false);
+			}
 			loadProducts().then(renderPage);
+		};
+	}
+	Array.prototype.forEach.call(document.querySelectorAll(".search-category-chip"), function(btn) {
+		btn.onclick = function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			applySearchCategory(btn.getAttribute("data-category"), btn.getAttribute("data-name"));
+		};
+	});
+	Array.prototype.forEach.call(document.querySelectorAll(".recent-search-chip,.search-suggestion"), function(btn) {
+		btn.onclick = function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			state.searchKeyword = btn.getAttribute("data-keyword") || "";
+			var input = document.getElementById("searchInput");
+			if (input) input.value = state.searchKeyword;
+			executeSearch();
+		};
+	});
+	var clearSearch = document.querySelector(".search-clear-filter");
+	if (clearSearch) {
+		clearSearch.onclick = function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			clearSearchFilters(true);
+			openSearchDropdown();
+		};
+	}
+	var viewAllSearch = document.querySelector(".search-view-all");
+	if (viewAllSearch) {
+		viewAllSearch.onclick = function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			clearSearchFilters(false);
+			if (state.page !== "home") setPage("home");
+			else renderPage();
+			setTimeout(scrollToProductCenter, 80);
 		};
 	}
 	Array.prototype.forEach.call(document.querySelectorAll(".use-coupon"), function(btn) {
@@ -5048,6 +5376,11 @@ function bindPageActions() {
 			setPage(page);
 		};
 	});
+	Array.prototype.forEach.call(document.querySelectorAll(".merchant-back-btn"), function(btn) {
+		btn.onclick = function() {
+			setPage(btn.getAttribute("data-page") || "merchantProductList");
+		};
+	});
 	var adminUserSearch = document.getElementById("adminUserSearch");
 	if (adminUserSearch) {
 		adminUserSearch.oninput = function() {
@@ -5296,13 +5629,14 @@ function bindPageActions() {
 	});
 	Array.prototype.forEach.call(document.querySelectorAll(".merchant-edit"), function(btn) {
 		btn.onclick = function() {
-			var product = state.merchantProducts.filter(function(p) { return String(p.id) === String(btn.getAttribute("data-id")); })[0];
-			document.getElementById("pageRoot").innerHTML = renderMerchantProductForm(product);
-			bindPageActions();
+			state.merchantEditingProductId = btn.getAttribute("data-id");
+			setPage("merchantProductEdit");
 		};
 	});
 	Array.prototype.forEach.call(document.querySelectorAll(".merchant-add-product"), function(btn) {
 		btn.onclick = function() {
+			setPage("merchantProductAdd");
+			return;
 			state.page = "merchantProductAdd";
 			try {
 				sessionStorage.setItem("hishoppingPage", "merchantProductAdd");
@@ -5843,6 +6177,7 @@ function renderPage() {
 	if (state.page === "merchantCenter") html = renderMerchantCenter();
 	if (state.page === "merchantProductList") html = renderMerchantProductList();
 	if (state.page === "merchantProductAdd") html = renderMerchantProductForm();
+	if (state.page === "merchantProductEdit") html = renderMerchantProductEditPage();
 	if (state.page === "merchantOrders") html = renderMerchantOrders();
 	if (state.page === "merchantReports") html = renderMerchantReports();
 	if (state.page === "merchantAnalytics") html = renderMerchantAnalytics();
@@ -5894,6 +6229,8 @@ function updateAuthView() {
 }
 
 function updateAuthRoleButtons() {
+	var nav = document.querySelector(".auth-role-nav");
+	if (nav) nav.setAttribute("data-active-role", state.authMode || "user");
 	Array.prototype.forEach.call(document.querySelectorAll(".auth-role-btn"), function(btn) {
 		btn.classList.toggle("active", btn.getAttribute("data-auth-mode") === state.authMode);
 	});
@@ -6065,6 +6402,7 @@ function afterAuth(data, restored) {
 		var savedPage = "home";
 		try {
 			savedPage = sessionStorage.getItem("hishoppingPage") || "home";
+			state.merchantEditingProductId = sessionStorage.getItem("hishoppingMerchantEditProductId") || null;
 		} catch (e) {
 		}
 		setPage(state.admin ? (restored && isAdminPage(savedPage) ? savedPage : "admin") : (state.merchant ? (restored && isMerchantPage(savedPage) ? savedPage : "merchantCenter") : (restored && !isAdminPage(savedPage) && !isMerchantPage(savedPage) ? savedPage : "home")));
@@ -6140,11 +6478,67 @@ document.getElementById("vipEntryBtn").onclick = function() {
 	setPage("vip");
 };
 
-document.getElementById("searchInput").oninput = function() {
-	if (!globalSearchEnabled()) return;
-	state.searchKeyword = this.value;
-	renderPage();
-};
+var searchInput = document.getElementById("searchInput");
+if (searchInput) {
+	searchInput.onfocus = function() {
+		openSearchDropdown();
+	};
+	searchInput.onclick = function(e) {
+		e.stopPropagation();
+		openSearchDropdown();
+	};
+	searchInput.oninput = function() {
+		if (!globalSearchEnabled()) return;
+		state.searchKeyword = this.value;
+		state.searchDropdownOpen = true;
+		renderSearchDropdown();
+		renderPage();
+	};
+	searchInput.onkeydown = function(e) {
+		if (!globalSearchEnabled()) return;
+		if (e.key === "Enter") {
+			e.preventDefault();
+			executeSearch();
+		}
+		if (e.key === "Escape") {
+			e.preventDefault();
+			closeSearchDropdown();
+		}
+	};
+}
+var searchDropdown = document.getElementById("searchDropdown");
+if (searchDropdown) {
+	searchDropdown.onclick = function(e) {
+		e.stopPropagation();
+		var category = e.target.closest(".search-category-chip");
+		if (category) {
+			e.preventDefault();
+			applySearchCategory(category.getAttribute("data-category"), category.getAttribute("data-name"));
+			return;
+		}
+		var recent = e.target.closest(".recent-search-chip,.search-suggestion");
+		if (recent) {
+			e.preventDefault();
+			state.searchKeyword = recent.getAttribute("data-keyword") || "";
+			if (searchInput) searchInput.value = state.searchKeyword;
+			executeSearch();
+			return;
+		}
+		if (e.target.closest(".search-clear-filter")) {
+			e.preventDefault();
+			clearSearchFilters(true);
+			openSearchDropdown();
+			return;
+		}
+		if (e.target.closest(".search-view-all")) {
+			e.preventDefault();
+			clearSearchFilters(false);
+			if (state.page !== "home") setPage("home");
+			else renderPage();
+			setTimeout(scrollToProductCenter, 80);
+		}
+	};
+}
 
 updateAuthView();
 updateCouponBadge();

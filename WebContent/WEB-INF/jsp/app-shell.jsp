@@ -15,7 +15,8 @@
 				</div>
 				<div class="search-box">
 					<span>⌕</span>
-					<input id="searchInput" placeholder="搜索商品、订单、用户...">
+					<input id="searchInput" placeholder="搜索商品、店铺、分类、游戏道具、虚拟商品">
+					<div class="search-dropdown" id="searchDropdown"></div>
 				</div>
 				<div class="top-actions">
 					<button class="icon-btn coupon-jump" type="button" title="我的优惠券" aria-label="我的优惠券"><img src="assets/img/top-coupon-icon.png?v=top-icon-20260601" alt=""><span id="couponBadge">0</span></button>

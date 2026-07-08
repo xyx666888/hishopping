@@ -34,8 +34,26 @@ public class AnalyticsDao {
 
     public Map<String, Object> adminAnalytics(int merchantId) {
         Map<String, Object> result = new LinkedHashMap<String, Object>();
-        result.put("summary", one("select (select count(1) from hishopping_product where status<>N'删除') product_count,(select count(1) from hishopping_order where status<>N'已取消') order_count,(select isnull(sum(isnull(oi.item_subtotal, oi.price * oi.quantity)),0) from hishopping_order_item oi join hishopping_order o on oi.order_id=o.id where o.status=N'已完成') sales_amount,(select isnull(sum(sales),0) from hishopping_product where status<>N'删除') total_sales,(select count(1) from hishopping_favorite) favorite_count,(select count(1) from hishop_product_review where isnull(status,N'ACTIVE')=N'ACTIVE') review_count,(select isnull(sum(like_count),0) from hishop_product_review where isnull(status,N'ACTIVE')=N'ACTIVE') review_like_count,(select isnull(avg(cast(rating as decimal(5,2))),0) from hishop_product_review where isnull(status,N'ACTIVE')=N'ACTIVE') shop_rating"));
-        result.put("shops", rows("select m.merchant_id,m.merchant_code,m.shop_name,count(p.id) product_count,isnull(sum(p.sales),0) total_sales,isnull((select count(distinct o.id) from hishopping_order o join hishopping_order_item oi on o.id=oi.order_id join hishopping_product op on oi.product_id=op.id where op.merchant_id=m.merchant_id and o.status<>N'已取消'),0) order_count,isnull((select sum(isnull(oi.item_subtotal, oi.price * oi.quantity)) from hishopping_order o join hishopping_order_item oi on o.id=oi.order_id join hishopping_product op on oi.product_id=op.id where op.merchant_id=m.merchant_id and o.status=N'已完成'),0) sales_amount,isnull(avg(nullif((select avg(cast(r.rating as decimal(5,2))) from hishop_product_review r where r.product_id=p.id and isnull(r.status,N'ACTIVE')=N'ACTIVE'),0)),0) shop_rating,isnull(sum((select count(1) from hishopping_favorite f where f.product_id=p.id)),0) favorite_count,isnull(sum((select count(1) from hishop_product_review r where r.product_id=p.id and isnull(r.status,N'ACTIVE')=N'ACTIVE')),0) review_count from hishop_merchant m left join hishopping_product p on m.merchant_id=p.merchant_id and p.status<>N'删除' group by m.merchant_id,m.merchant_code,m.shop_name order by shop_rating desc,total_sales desc"));
+        result.put("summary", one("select "
+                + "(select count(1) from hishopping_product where status<>N'删除') product_count,"
+                + "(select count(1) from hishopping_order where status<>N'已取消') order_count,"
+                + "(select isnull(sum(isnull(oi.item_subtotal, oi.price * oi.quantity)),0) from hishopping_order_item oi join hishopping_order o on oi.order_id=o.id where o.status=N'已完成') sales_amount,"
+                + "(select isnull(sum(sales),0) from hishopping_product where status<>N'删除') total_sales,"
+                + "(select count(1) from hishop_merchant where isnull(status,N'')<>N'CANCELLED') merchant_count,"
+                + "(select count(1) from hishopping_user where role=N'user' and isnull(status,N'')<>N'已注销') user_count,"
+                + "(select count(1) from hishopping_favorite) favorite_count,"
+                + "(select count(1) from hishop_product_review where isnull(status,N'ACTIVE')=N'ACTIVE') review_count,"
+                + "(select isnull(sum(like_count),0) from hishop_product_review where isnull(status,N'ACTIVE')=N'ACTIVE') review_like_count,"
+                + "(select isnull(avg(cast(rating as decimal(5,2))),0) from hishop_product_review where isnull(status,N'ACTIVE')=N'ACTIVE') shop_rating"));
+        result.put("shops", rows("select m.merchant_id,m.merchant_code,m.merchant_name,m.shop_name,"
+                + "isnull(ps.product_count,0) product_count,isnull(ps.total_sales,0) total_sales,"
+                + "isnull((select count(distinct o.id) from hishopping_order o join hishopping_order_item oi on o.id=oi.order_id join hishopping_product op on oi.product_id=op.id where op.merchant_id=m.merchant_id and o.status<>N'已取消'),0) order_count,"
+                + "isnull((select sum(isnull(oi.item_subtotal, oi.price * oi.quantity)) from hishopping_order o join hishopping_order_item oi on o.id=oi.order_id join hishopping_product op on oi.product_id=op.id where op.merchant_id=m.merchant_id and o.status=N'已完成'),0) sales_amount,"
+                + "isnull(ps.shop_rating,0) shop_rating,isnull(ps.favorite_count,0) favorite_count,isnull(ps.review_count,0) review_count "
+                + "from hishop_merchant m left join (select merchant_id,count(1) product_count,isnull(sum(sales),0) total_sales,isnull(sum(favorite_count),0) favorite_count,isnull(sum(review_count),0) review_count,isnull(avg(nullif(average_rating,0)),0) shop_rating from ("
+                + productStatsSql("where p.status<>N'删除'")
+                + ") product_stats group by merchant_id) ps on m.merchant_id=ps.merchant_id "
+                + "where isnull(m.status,N'')<>N'CANCELLED' order by shop_rating desc,total_sales desc,m.merchant_id desc"));
         String filter = merchantId > 0 ? "where p.merchant_id=? and p.status<>N'删除'" : "where p.status<>N'删除'";
         result.put("products", merchantId > 0
                 ? rows(productStatsSql(filter + " order by p.sales desc,favorite_count desc,average_rating desc,p.id desc"), merchantId)

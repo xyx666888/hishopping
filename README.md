@@ -26,7 +26,7 @@
 
 **HiShopping 嗨购商城** 是一个基于 **Java Servlet / JSP** 的综合购物商城系统，围绕电商平台的常见业务流程进行设计与实现。
 
-项目包含用户端、商家端和管理员端，尝试模拟一个较完整的线上购物平台，包括商品浏览、规格选择、购物车、订单、优惠券、VIP 成长体系、评价互动、举报处理、商家管理以及后台审核等功能。
+项目包含用户端、商家端和管理员端，尝试模拟一个较完整的线上购物平台，包括商品浏览、分类搜索、智能推荐入口、规格选择、购物车、订单、优惠券、VIP 成长体系、评价互动、举报处理、商家管理以及后台审核和运营分析等功能。
 
 ---
 
@@ -35,7 +35,9 @@
 ### 👤 用户端
 
 - 用户注册、登录、验证码校验与会话管理
-- 商品浏览、搜索、详情查看与规格选择
+- 商品浏览、分类筛选、关键词搜索、最近搜索与详情查看
+- 推荐、热门、精选、发现等商品入口
+- 商品规格选择与库存校验
 - 购物车管理
 - 收藏商品
 - 下单、订单管理与售后申请
@@ -49,7 +51,7 @@
 ### 🏪 商家端
 
 - 商家注册、验证码校验与入驻申请
-- 商品发布、规格配置、库存与上下架管理
+- 商品发布、编辑、规格配置、库存与上下架管理
 - 商品图片上传
 - 商家订单处理
 - 优惠券管理
@@ -65,7 +67,7 @@
 - 首页轮播图管理
 - 账号资料、头像、注销与恢复申请审核
 - 举报管理：筛选、查看并处理用户和商家提交的举报
-- 平台运营数据统计
+- 平台运营数据统计：商品排行、店铺分析、用户与店铺数量、评价和收藏表现
 
 ---
 
@@ -146,7 +148,7 @@ Suggestions, feedback, issues, and improvement ideas are sincerely welcome! ✨
 
 **HiShopping** is a comprehensive shopping mall system based on **Java Servlet / JSP**.
 
-The project is designed around common e-commerce business workflows. It includes user-side, merchant-side, and administrator-side features, trying to simulate a relatively complete online shopping platform with product browsing, specification selection, shopping cart, orders, coupons, VIP growth, review interaction, report handling, merchant management, and admin review workflows.
+The project is designed around common e-commerce business workflows. It includes user-side, merchant-side, and administrator-side features, trying to simulate a relatively complete online shopping platform with product browsing, category-based search, smart product feeds, specification selection, shopping cart, orders, coupons, VIP growth, review interaction, report handling, merchant management, admin review workflows, and operational analytics.
 
 ---
 
@@ -155,7 +157,9 @@ The project is designed around common e-commerce business workflows. It includes
 ### 👤 User Side
 
 - User registration, login, captcha verification, and session management
-- Product browsing, searching, detail pages, and specification selection
+- Product browsing, category filtering, keyword search, recent searches, and detail pages
+- Recommended, hot, featured, and discovery product feeds
+- Product specification selection and stock validation
 - Shopping cart management
 - Product favorites
 - Order creation, order management, and after-sales requests
@@ -169,7 +173,7 @@ The project is designed around common e-commerce business workflows. It includes
 ### 🏪 Merchant Side
 
 - Merchant registration, captcha verification, and application
-- Product publishing, specification configuration, stock management, and sale status management
+- Product publishing, editing, specification configuration, stock management, and sale status management
 - Product image upload
 - Merchant order processing
 - Coupon management
@@ -185,7 +189,7 @@ The project is designed around common e-commerce business workflows. It includes
 - Homepage banner management
 - Account profile, avatar, cancellation, and restoration request review
 - Report management: filtering, viewing, and handling reports submitted by users and merchants
-- Platform analytics
+- Platform analytics: product rankings, shop analysis, user and merchant counts, review performance, and favorite statistics
 
 ---
 

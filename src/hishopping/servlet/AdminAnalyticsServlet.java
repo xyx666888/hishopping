@@ -21,8 +21,13 @@ public class AdminAnalyticsServlet extends HttpServlet {
             JsonUtil.write(response, ServletUtil.fail("请先登录管理员账号。"));
             return;
         }
-        Map<String, Object> result = ServletUtil.ok();
-        result.put("analytics", analyticsDao.adminAnalytics(ServletUtil.intParam(request, "merchantId", 0)));
+        Map<String, Object> result;
+        try {
+            result = ServletUtil.ok();
+            result.put("analytics", analyticsDao.adminAnalytics(ServletUtil.intParam(request, "merchantId", 0)));
+        } catch (RuntimeException e) {
+            result = ServletUtil.fail("数据分析加载失败：" + e.getMessage());
+        }
         JsonUtil.write(response, result);
     }
 }

@@ -24,6 +24,7 @@ public class ProductDao {
         BusinessDao.ensureSchema();
         ProductMediaDao.ensureSchema();
         ensureProductAttrSchema();
+        ensureCategoryCatalog();
     }
 
     public List<Category> findCategories() {
@@ -489,6 +490,72 @@ public class ProductDao {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } finally {
+            DBUtil.closeDBResource(null, st, conn);
+        }
+    }
+
+    private void ensureCategoryCatalog() {
+        String[][] categories = new String[][] {
+                {"食品生鲜", "鲜", "零食、粮油、生鲜、速食、地方特产", "1"},
+                {"酒水饮料", "饮", "饮料、茶咖、冲调、酒水等", "2"},
+                {"家用电器", "电", "厨房电器、生活电器、大家电、小家电", "3"},
+                {"手机数码", "数", "手机、平板、相机、智能设备、数码配件", "4"},
+                {"电脑办公", "办", "电脑整机、办公设备、文具耗材、网络设备", "5"},
+                {"家居家装", "居", "装修建材、灯具照明、收纳装饰、居家日用", "6"},
+                {"家具家纺", "家", "家具、床品、布艺、家纺套件", "7"},
+                {"服饰内衣", "服", "男女服饰、内衣、配饰、季节服装", "8"},
+                {"鞋靴箱包", "包", "鞋靴、箱包、旅行用品、皮具配件", "9"},
+                {"美妆个护", "美", "护肤、彩妆、洗护、香氛和个人护理", "10"},
+                {"母婴童装", "婴", "母婴用品、童装童鞋、喂养洗护、启蒙用品", "11"},
+                {"运动户外", "运", "运动装备、户外用品、健身器材、骑行用品", "12"},
+                {"玩具乐器", "玩", "儿童玩具、模型、乐器、益智用品", "13"},
+                {"汽车用品", "车", "车载电器、养护用品、汽车装饰、配件工具", "14"},
+                {"图书文娱", "书", "图书、文具、影音、文创与娱乐周边", "15"},
+                {"宠物用品", "宠", "宠物食品、清洁护理、牵引用具、玩具用品", "16"},
+                {"珠宝饰品", "饰", "珠宝首饰、手表配饰、礼品饰品", "17"},
+                {"鲜花绿植", "花", "鲜花、绿植、园艺花材、节庆花礼", "18"},
+                {"厨具餐具", "厨", "锅具、餐具、厨房工具、烘焙器具", "19"},
+                {"清洁纸品", "洁", "纸品湿巾、衣物清洁、家清工具、除菌用品", "20"},
+                {"医疗健康", "健", "健康监测、护理用品、营养保健与康复辅助", "21"},
+                {"工业五金", "五", "五金工具、工业耗材、仪器仪表、劳保用品", "22"},
+                {"农资园艺", "农", "种子肥料、园艺工具、农用物资、绿化用品", "23"},
+                {"本地生活", "生", "到店服务、生活服务、家政维修、休闲体验", "24"},
+                {"充值缴费", "充", "话费充值、流量包、生活缴费与账户充值", "25"},
+                {"虚拟商品", "虚", "虚拟权益、电子凭证、在线服务和非实物商品", "26"},
+                {"游戏道具", "游", "游戏点卡、道具礼包、皮肤兑换和虚拟装备", "27"},
+                {"数字内容", "数", "电子书、音视频内容、素材模板和数字资料", "28"},
+                {"会员服务", "会", "会员权益、订阅服务、增值服务和专属礼包", "29"},
+                {"课程教育", "课", "在线课程、学习资料、考试培训和技能提升", "30"},
+                {"软件工具", "软", "软件授权、效率工具、插件模板和云服务", "31"},
+                {"票务卡券", "票", "演出票券、兑换卡、礼品卡和消费券", "32"},
+                {"二手闲置", "二", "二手数码、闲置好物、转让商品和旧物循环", "33"},
+                {"其他商品", "其", "暂未归入固定类目的综合商品", "99"}
+        };
+        Connection conn = null;
+        Statement st = null;
+        PreparedStatement ps = null;
+        try {
+            conn = DBUtil.getConn();
+            st = conn.createStatement();
+            st.executeUpdate("IF EXISTS (SELECT 1 FROM dbo.hishopping_category WHERE name=N'食品') AND NOT EXISTS (SELECT 1 FROM dbo.hishopping_category WHERE name=N'食品生鲜') UPDATE dbo.hishopping_category SET name=N'食品生鲜', icon_text=N'鲜', description=N'零食、粮油、生鲜、速食、地方特产', sort_no=1 WHERE name=N'食品'");
+            st.executeUpdate("IF EXISTS (SELECT 1 FROM dbo.hishopping_category WHERE name=N'图书') AND NOT EXISTS (SELECT 1 FROM dbo.hishopping_category WHERE name=N'图书文娱') UPDATE dbo.hishopping_category SET name=N'图书文娱', icon_text=N'书', description=N'图书、文具、影音、文创与娱乐周边', sort_no=15 WHERE name=N'图书'");
+            String sql = "MERGE dbo.hishopping_category AS target "
+                    + "USING (SELECT ? AS name, ? AS icon_text, ? AS description, ? AS sort_no) AS source "
+                    + "ON target.name = source.name "
+                    + "WHEN MATCHED THEN UPDATE SET icon_text=source.icon_text, description=source.description, sort_no=source.sort_no "
+                    + "WHEN NOT MATCHED THEN INSERT(name, icon_text, description, sort_no) VALUES(source.name, source.icon_text, source.description, source.sort_no);";
+            ps = conn.prepareStatement(sql);
+            for (String[] c : categories) {
+                ps.setString(1, c[0]);
+                ps.setString(2, c[1]);
+                ps.setString(3, c[2]);
+                ps.setInt(4, Integer.parseInt(c[3]));
+                ps.executeUpdate();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        } finally {
+            DBUtil.closeDBResource(null, ps, null);
             DBUtil.closeDBResource(null, st, conn);
         }
     }
